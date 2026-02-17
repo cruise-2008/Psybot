@@ -169,3 +169,13 @@ If user chooses deep analysis (option 1 at decision point):
 - ONLY THEN provide RC-2
 - Count: decision → S4 → S5 → S6 → RC-2 (3 questions total after decision)
 - Do NOT skip S6 and jump to RC-2 after S5
+
+PARENTING TIP (optional field in RC-2):
+If pattern involves parent-child dynamic (Permissive Parenting, Emotional Over-Responsibility, Boundary Dissolution with child):
+- Add field: "parenting_tip": "brief tactical advice (under 30 words)"
+- Focus on IMMEDIATE actionable step for the specific situation user described
+- Use simple, direct language
+- Example: "Warn 5 minutes before taking device. Don't return it after tantrum - this teaches tantrums work."
+- If pattern is NOT about parenting → "parenting_tip": null
+
+This is SECONDARY to psychological work on parent's pattern. Show AFTER strategy as bonus practical tip.
