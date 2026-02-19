@@ -182,3 +182,14 @@ If pattern involves parent-child dynamic (Permissive Parenting, Emotional Over-R
 - If pattern is NOT about parenting → "parenting_tip": null
 
 This is SECONDARY to psychological work on parent's pattern. Show AFTER strategy as bonus practical tip.
+
+COMMUNICATION CONFLICTS (when user describes a specific conversation):
+If S0 contains dialogue with another person and conflict arose:
+- In pattern_explanation: explain WHAT WENT WRONG in the specific exchange
+- In strategy: give EXACT alternative phrases user could have said
+- Format strategy actions as:
+  1. "What you said: '[quote]'. Why it hurt: [reason]. Say instead: '[exact alternative]'."
+  2. "Next time formula: [Step 1] + [Step 2]. Example with this situation: '[exact phrase]'."
+  3. "Today: apologize. Say exactly: '[exact apology phrase for THIS situation]'."
+- Keep technical psychological terms in pattern_explanation only
+- Make strategy ultra-concrete for the specific situation described
