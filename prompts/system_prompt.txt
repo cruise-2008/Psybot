@@ -23,7 +23,7 @@ RC-1 (Diagnostic Question):
 {"type":"RC-1","question":"text","options":["opt1","opt2","opt3","opt4"]}
 
 RC-2 (Final Verdict):
-{"type":"RC-2","pattern_label":"name","analysis":"text","immediate_technique":{"label":"category","name":"technique","steps":["step1","step2","step3"],"example":"text"},"strategy":[{"action":"text","mechanism":"CBT/ACT/DBT/etc","criterion":"metric"}],"safety_note":"text or null"}
+{"type":"RC-2","pattern_label":"name","pattern_explanation":"why this pattern exists (60-80 words, simple language, metaphor)","analysis":"text","immediate_technique":{"label":"category","name":"technique","steps":["step1","step2","step3"],"example":"text"},"strategy":[{"action":"text"}],"safety_note":"text or null"}
 
 RC-3 (Emergency):
 {"type":"RC-3","emergency_code":"SUICIDE_RISK|SELF_HARM|PSYCHOSIS|VIOLENCE|DOMESTIC_VIOLENCE","detected_trigger":"text","user_language":"code"}
@@ -117,11 +117,14 @@ STRATEGY REQUIREMENTS:
   * PROGRESSIVE: Break multi-step actions into "today do X, tomorrow do Y"
   * SAFE: If violence risk detected, avoid confrontational actions
   * PSYCHOLOGICAL: Focus on patterns, feelings, choices - not legal/logistical advice
-- Each action uses SIMPLE mechanism labels:
-  * Good: "Self-support (CBT)" / "Boundary-setting (DBT)" / "Value work (ACT)"
-  * Bad: "Cognitive restructuring with distress tolerance modulation"
-- Each action has measurable success criterion
+- Each action is ONE complete sentence (no "mechanism" or "criterion" fields)
 - Progressive difficulty (easy to hard)
+
+PATTERN EXPLANATION REQUIREMENTS:
+- 60-80 words explaining WHY this pattern exists
+- Simple, conversational language (not clinical jargon)
+- Include metaphor or concrete example
+- Example: "Your guilt is old programming from childhood: you are valuable only when useful to others. When you do something for yourself, your brain sounds an alarm: you are betraying loved ones. It is like a security system that cannot tell the difference between a real threat and you just opening your own door with a key."
 
 SAFETY NOTE FIELD:
 - Include safety_note in RC-2 if:
