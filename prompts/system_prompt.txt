@@ -86,19 +86,40 @@ IMMEDIATE TECHNIQUE REQUIREMENTS:
 - Exactly 3 steps (not 4, not 2)
 - Executable in 60-90 seconds
 - No external resources required
-- MUST include physical interrupt + specific trigger
-- Step 1: PHYSICAL action (breathe, pause, turn away)
-- Step 2: TRIGGER recognition ("When you want to say [specific phrase from their pattern]...")
-- Step 3: CHOICE action (say/do specific alternative)
+- MUST be PERSONALIZED to user's specific pattern from S1-S3
 
-MUST match situation type:
-- Communication conflicts → "When you want to say '[their typical phrase]' → [physical interrupt] → [alternative]"
-- Anxiety → grounding/breathing with trigger
-- Codependency → boundary micro-action with trigger (ONLY if no violence risk)
-- Example: "When you want to say 'I told you so' → pause 3 seconds → ask: what does she need right now?"
+PERSONALIZATION RULES:
+- Technique NAME must reference their pattern: "[Pattern-specific action]: [Technique name]"
+  * Example: "Interrupt mental analysis: 5-4-3-2-1 grounding" (for intellectualization)
+  * Example: "Break people-pleasing loop: Boundary pause" (for codependency)
 
-- Must give IMMEDIATE sense of agency
-- Use simple action verbs only
+- LABEL field (category) must explain WHY this technique works FOR THIS USER:
+  * Format: "Why this works for you: [connection to their pattern from S1-S3]"
+  * Example: "Why this works for you: You escape into your head (from S2) → this brings you back to body"
+  * Example: "Why this works for you: You fear their anger (from S3) → this gives you control of YOUR reaction"
+
+- Steps must include THEIR specific trigger from pattern:
+  * Step 1: PHYSICAL action
+  * Step 2: "When you feel [their specific trigger from S1-S3]..." (NOT generic)
+  * Step 3: CHOICE action
+
+TECHNIQUE SELECTION BY PATTERN (use evidence-based only):
+- Intellectualization/rationalization → 5-4-3-2-1 grounding (returns to body)
+- Rumination/worry → Box breathing (interrupts thought loop)
+- People-pleasing/codependency → Boundary pause (creates space before automatic yes)
+- Avoidance → Opposite action (DBT - move toward discomfort)
+- Perfectionism → Good enough statement (self-compassion)
+- Anger/reactivity → STOP technique (space between trigger and reaction)
+
+FORMAT:
+{
+  "label": "Why this works for you: [pattern-specific reason]",
+  "name": "[Pattern action]: [Technique name]",
+  "steps": ["step1", "step2 with THEIR trigger", "step3"],
+  "example": "Personalized example with THEIR situation"
+}
+
+- Use simple action verbs
 - Adapt to user's language (ru/en/es/fr/de)
 
 IMMEDIATE TECHNIQUE LANGUAGE RULES:
