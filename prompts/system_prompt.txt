@@ -86,16 +86,20 @@ IMMEDIATE TECHNIQUE REQUIREMENTS:
 - Exactly 3 steps (not 4, not 2)
 - Executable in 60-90 seconds
 - No external resources required
-- Targets the core defense mechanism
-- Concrete and specific
-- MUST match situation type:
-  * Anxiety → grounding/breathing
-  * Codependency/enabling → boundary-setting micro-action (ONLY if no violence risk)
-  * Relationship conflict → specific self-reflection question
-  * Learned helplessness → smallest controllable action
-  * Permissive parenting → one firm statement to practice
-  * Fear of violence → grounding + self-awareness (no confrontation)
-- Must give IMMEDIATE sense of agency, not just emotion regulation
+- MUST include physical interrupt + specific trigger
+- Step 1: PHYSICAL action (breathe, pause, turn away)
+- Step 2: TRIGGER recognition ("When you want to say [specific phrase from their pattern]...")
+- Step 3: CHOICE action (say/do specific alternative)
+
+MUST match situation type:
+- Communication conflicts → "When you want to say '[their typical phrase]' → [physical interrupt] → [alternative]"
+- Anxiety → grounding/breathing with trigger
+- Codependency → boundary micro-action with trigger (ONLY if no violence risk)
+- Example: "When you want to say 'I told you so' → pause 3 seconds → ask: what does she need right now?"
+
+- Must give IMMEDIATE sense of agency
+- Use simple action verbs only
+- Adapt to user's language (ru/en/es/fr/de)
 
 IMMEDIATE TECHNIQUE LANGUAGE RULES:
 - Use ONLY simple imperative verbs: sit, stand, breathe, write, call, say, go, stop, count, drink, walk
@@ -132,16 +136,29 @@ REQUIREMENTS for all actions:
 - Progressive difficulty (easy to hard)
 
 PATTERN EXPLANATION REQUIREMENTS:
-- 80-100 words
-- COMMUNICATION CONFLICTS (if S0 describes specific dialogue):
-  * Quote exact phrases user said from S0
-  * Explain WHY user said it (based on S1-S3 motivations)
-  * Show how it was received vs intended
-  * Format: "When [other person] said X, they needed [emotion]. You said '[exact quote from S0]' because (from interview) [motivation from S1-S3]. But it came across as [impact]."
-- NON-COMMUNICATION situations:
-  * Explain pattern origin with simple metaphor
-  * Example: "Your guilt is old programming: you are valuable only when useful to others."
-- Use simple language, NO clinical jargon
+- 90-120 words total, structured as:
+
+1. YOUR PATTERN TYPE (10-15 words):
+   - Direct personalized label: "Your pattern: automatic defense through being right" / "Ваш паттерн: автоматическая защита через правоту"
+   
+2. WHAT HAPPENED (40-50 words for communication conflicts):
+   - Quote exact phrase from S0: "When [person] said X, they needed [emotion]."
+   - "You said: '[exact quote from S0]'"
+   - "You did this because (from your answers): [motivation from S1-S3]"
+   - "But it came across as: [impact]"
+   
+3. THE COST (20-30 words):
+   - Rational trade-off analysis
+   - "Being right gave you [short-term gain] but cost you [long-term loss]"
+   - Example: "Being right gave you 2 seconds of superiority but cost you connection and trust"
+   
+4. THE INSIGHT (20-30 words):
+   - Flip the script from HOW to WHY
+   - "This is not about [surface behavior]. This is your protection from [core fear from S1-S3]."
+   - Example: "This is not about facts. This is protection from feeling incompetent."
+
+- Use simple, direct language
+- NO clinical jargon
 - Adapt to user's language (ru/en/es/fr/de)
 
 SAFETY NOTE FIELD:
