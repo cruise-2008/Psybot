@@ -109,22 +109,40 @@ IMMEDIATE TECHNIQUE LANGUAGE RULES:
 
 STRATEGY REQUIREMENTS:
 - Exactly 3 actions
-- Each action MUST be:
-  * SPECIFIC: Include exact words to say or exact steps to take
-  * TIMEBOUND: Today, tomorrow, this week, next 3 days
-  * ACTIONABLE: Does NOT require others to change first
-  * USER-FOCUSED: Addresses USER's agency and choices
-  * PROGRESSIVE: Break multi-step actions into "today do X, tomorrow do Y"
-  * SAFE: If violence risk detected, avoid confrontational actions
-  * PSYCHOLOGICAL: Focus on patterns, feelings, choices - not legal/logistical advice
-- Each action is ONE complete sentence (no "mechanism" or "criterion" fields)
+- Each action is ONE complete sentence or paragraph (no separate mechanism/criterion fields)
+
+ACTION 1 - Deconstruct the actual situation:
+- COMMUNICATION CONFLICTS: "What you said: '[exact quote from S0]'. Why it hurt: [reason from pattern]. Say instead: '[exact alternative for THIS situation]'."
+- NON-COMMUNICATION: "Today [specific action for THIS situation]. Example: [concrete step]."
+
+ACTION 2 - Pattern-based formula for future:
+- "Your pattern: when you [trigger from S1-S3], you [behavior]. Formula for next time: [step A] then [step B]. Example with this situation: '[exact phrase]'."
+- Make it applicable to SIMILAR future situations
+
+ACTION 3 - Immediate repair/practice:
+- COMMUNICATION CONFLICTS: "Today apologize. Say exactly: '[specific apology phrase for THIS situation with THIS person]'."
+- NON-COMMUNICATION: "This week practice: [specific micro-action]. Do it [number] times."
+
+REQUIREMENTS for all actions:
+- SPECIFIC to user's actual situation from S0
+- TIMEBOUND (today/tomorrow/this week)
+- SAFE (no confrontation if violence risk)
+- USER-FOCUSED (user's agency, not changing others)
+- Adapt language to user's language (ru/en/es/fr/de)
 - Progressive difficulty (easy to hard)
 
 PATTERN EXPLANATION REQUIREMENTS:
-- 60-80 words explaining WHY this pattern exists
-- Simple, conversational language (not clinical jargon)
-- Include metaphor or concrete example
-- Example: "Your guilt is old programming from childhood: you are valuable only when useful to others. When you do something for yourself, your brain sounds an alarm: you are betraying loved ones. It is like a security system that cannot tell the difference between a real threat and you just opening your own door with a key."
+- 80-100 words
+- COMMUNICATION CONFLICTS (if S0 describes specific dialogue):
+  * Quote exact phrases user said from S0
+  * Explain WHY user said it (based on S1-S3 motivations)
+  * Show how it was received vs intended
+  * Format: "When [other person] said X, they needed [emotion]. You said '[exact quote from S0]' because (from interview) [motivation from S1-S3]. But it came across as [impact]."
+- NON-COMMUNICATION situations:
+  * Explain pattern origin with simple metaphor
+  * Example: "Your guilt is old programming: you are valuable only when useful to others."
+- Use simple language, NO clinical jargon
+- Adapt to user's language (ru/en/es/fr/de)
 
 SAFETY NOTE FIELD:
 - Include safety_note in RC-2 if:
