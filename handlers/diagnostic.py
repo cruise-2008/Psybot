@@ -189,7 +189,14 @@ async def handle_s3(message: Message, state: FSMContext):
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
-        if len(llm_response.get("options", [])) != 2:
+        
+        # Проверить что это decision_point или RC-1
+        if llm_response.get("type") not in ["RC-1", "decision_point"]:
+            logger.warning(f"Unexpected type after S3: {llm_response.get('type')}")
+            llm_response["type"] = "RC-1"
+        
+        # Если нет question field, создать вручную
+        if "question" not in llm_response or len(llm_response.get("options", [])) != 2:
             logger.warning(f"LLM skipped decision point, forcing manually for user {user_id}")
             decision_options_map = {
                 "ru": ["Глубокий анализ (3 дополнительных вопроса)", "Показать результат сейчас"],
@@ -210,6 +217,7 @@ async def handle_s3(message: Message, state: FSMContext):
                 "question": decision_question_map.get(lang, decision_question_map["en"]),
                 "options": decision_options_map.get(lang, decision_options_map["en"])
             }
+        
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
         await storage.update_session(user_id, {"last_response": llm_response})
         question_text = format_question_with_options(
@@ -289,17 +297,28 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
-        await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response.get("question", "")})
-        await storage.update_session(user_id, {"last_response": llm_response})
-        if next_state is None or llm_response.get("type") == "RC-2":
+        
+        # Проверить тип ответа
+        if llm_response.get("type") == "RC-2" or next_state is None:
+            # Финальный вердикт
+            if "content" not in llm_response:
+                logger.error(f"RC-2 missing content field: {llm_response}")
+                await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+                return
             await send_verdict(message, state, llm_response, user_id, lang)
-        else:
+        elif llm_response.get("type") == "RC-1" and "question" in llm_response:
+            # Следующий вопрос
+            await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
+            await storage.update_session(user_id, {"last_response": llm_response})
             question_text = format_question_with_options(
                 llm_response["question"], llm_response["options"],
                 question_num=question_num + 1, total=6, language=lang
             )
             await message.answer(question_text)
             await state.set_state(next_state)
+        else:
+            logger.error(f"Unexpected response type in deep analysis: {llm_response.get('type')}")
+            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
     except Exception as e:
         logger.error(f"Error in handle_deep_analysis: {e}")
         session = await storage.get_session(user_id) or {}
