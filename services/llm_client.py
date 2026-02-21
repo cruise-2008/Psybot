@@ -75,13 +75,11 @@ class LLMClient:
 User's language: {user_language}. Respond in this language.
 
 CRITICAL JSON RULES:
-1. Output ONLY valid JSON
-2. NO markdown fences
-3. ESCAPE all quotes inside strings using backslash
-4. Example CORRECT: "Say to child: \\"Phone away in 5 minutes\\""
-5. Example WRONG: "Say to child: "Phone away in 5 minutes""
-6. ALL nested quotes MUST be escaped with \\
-7. Keep text concise"""
+1. NO quotes inside field values - rephrase to avoid them
+2. Example WRONG: "When you say \\"I must accept\\""
+3. Example RIGHT: "When you say you must accept the situation"
+4. NO markdown fences
+5. Keep text concise"""
 
         history_text = ""
         for msg in conversation_history:

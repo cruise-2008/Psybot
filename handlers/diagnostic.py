@@ -306,23 +306,11 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
         await message.answer(ERROR_MESSAGES.get(session.get("language", "en"), ERROR_MESSAGES["en"]))
 
 async def send_verdict(message: Message, state: FSMContext, verdict: dict, user_id: int, language: str):
-    log_verdict(user_id, verdict["pattern_label"], language)
-    text = f"📊 **{verdict['pattern_label']}**\n\n"
-    if verdict.get('pattern_explanation'):
-        text += f"{verdict['pattern_explanation']}\n\n"
-    text += f"{verdict['analysis']}\n\n"
-    if verdict.get('safety_note'):
-        text += f"⚠️ **{verdict['safety_note']}**\n\n"
-    text += f"⚡ **{verdict['immediate_technique']['label']}**: {verdict['immediate_technique']['name']}\n"
-    for i, step in enumerate(verdict['immediate_technique']['steps'], 1):
-        text += f"{i}. {step}\n"
-    text += f"\n💡 {verdict['immediate_technique']['example']}\n\n"
-    text += "📋 **Стратегия:**\n"
-    for i, action in enumerate(verdict['strategy'], 1):
-        if isinstance(action, dict):
-            text += f"\n{i}. {action.get('action', action)}\n"
-        else:
-            text += f"\n{i}. {action}\n"
+    log_verdict(user_id, verdict.get("pattern_label", "Unknown"), language)
+    
+    # Новый формат: просто content field с markdown
+    text = verdict.get("content", "Анализ недоступен")
+    
     await message.answer(text, parse_mode="Markdown")
     await storage.clear_session(user_id)
     await state.clear()
