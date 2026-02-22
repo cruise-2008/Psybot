@@ -89,6 +89,7 @@ async def start_diagnostic(message: Message, state: FSMContext, s0_text: str):
         lang = session.get("language", "en")
         await storage.add_to_history(user_id, {"role": "user", "content": s0_text})
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+        
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
             await message.answer(llm_response["message"])
             await storage.clear_session(user_id)
@@ -98,10 +99,11 @@ async def start_diagnostic(message: Message, state: FSMContext, s0_text: str):
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response)
             return
-        if "options" not in llm_response:
-            logger.error(f"RC-1 missing options: {llm_response}")
+        if llm_response.get("type") != "RC-1" or "question" not in llm_response or "options" not in llm_response:
+            logger.error(f"Invalid S1 response: {llm_response}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
             return
+            
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
         await storage.update_session(user_id, {"last_response": llm_response})
         question_text = format_question_with_options(
@@ -115,72 +117,55 @@ async def start_diagnostic(message: Message, state: FSMContext, s0_text: str):
         session = await storage.get_session(user_id) or {}
         await message.answer(ERROR_MESSAGES.get(session.get("language", "en"), ERROR_MESSAGES["en"]))
 
-@router.message(DiagnosticStates.s1)
-async def handle_s1(message: Message, state: FSMContext):
+async def handle_question(message: Message, state: FSMContext, next_state, question_num: int):
+    """Generic handler for S1-S3"""
     user_id = message.from_user.id
     try:
         session = await storage.get_session(user_id)
         if not session:
             await message.answer("Сессия истекла. Используйте /start")
             return
+        
         lang = session.get("language", "en")
         options = session.get("last_response", {}).get("options", [])
         user_answer = map_input_to_option(message.text, options)
+        
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+        
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
             await message.answer(llm_response["message"])
-            await storage.clear_session(user_id); await state.clear(); return
+            await storage.clear_session(user_id)
+            await state.clear()
+            return
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
-            await handle_emergency(message, state, llm_response); return
-        if "options" not in llm_response:
-            logger.error(f"RC-1 missing options: {llm_response}")
+            await handle_emergency(message, state, llm_response)
+            return
+        if llm_response.get("type") != "RC-1" or "question" not in llm_response or "options" not in llm_response:
+            logger.error(f"Invalid RC-1 response at S{question_num}: {llm_response}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
             return
+        
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
         await storage.update_session(user_id, {"last_response": llm_response})
         question_text = format_question_with_options(
-            llm_response["question"], llm_response["options"], question_num=2, language=lang
+            llm_response["question"], llm_response["options"], question_num=question_num+1, language=lang
         )
         await message.answer(question_text)
-        await state.set_state(DiagnosticStates.s2)
+        await state.set_state(next_state)
     except Exception as e:
-        logger.error(f"Error in handle_s1: {e}")
+        logger.error(f"Error in handle S{question_num}: {e}")
         session = await storage.get_session(user_id) or {}
         await message.answer(ERROR_MESSAGES.get(session.get("language", "en"), ERROR_MESSAGES["en"]))
 
+@router.message(DiagnosticStates.s1)
+async def handle_s1(message: Message, state: FSMContext):
+    await handle_question(message, state, DiagnosticStates.s2, 1)
+
 @router.message(DiagnosticStates.s2)
 async def handle_s2(message: Message, state: FSMContext):
-    user_id = message.from_user.id
-    try:
-        session = await storage.get_session(user_id)
-        lang = session.get("language", "en")
-        options = session.get("last_response", {}).get("options", [])
-        user_answer = map_input_to_option(message.text, options)
-        await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
-        llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-        if llm_response.get("type") == "RATE_LIMIT_ERROR":
-            await message.answer(llm_response["message"])
-            await storage.clear_session(user_id); await state.clear(); return
-        if llm_response.get("type") == "RC-3":
-            from handlers.emergency import handle_emergency
-            await handle_emergency(message, state, llm_response); return
-        if "options" not in llm_response:
-            logger.error(f"RC-1 missing options: {llm_response}")
-            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
-            return
-        await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
-        await storage.update_session(user_id, {"last_response": llm_response})
-        question_text = format_question_with_options(
-            llm_response["question"], llm_response["options"], question_num=3, language=lang
-        )
-        await message.answer(question_text)
-        await state.set_state(DiagnosticStates.s3)
-    except Exception as e:
-        logger.error(f"Error in handle_s2: {e}")
-        session = await storage.get_session(user_id) or {}
-        await message.answer(ERROR_MESSAGES.get(session.get("language", "en"), ERROR_MESSAGES["en"]))
+    await handle_question(message, state, DiagnosticStates.s3, 2)
 
 @router.message(DiagnosticStates.s3)
 async def handle_s3(message: Message, state: FSMContext):
@@ -190,20 +175,25 @@ async def handle_s3(message: Message, state: FSMContext):
         lang = session.get("language", "en")
         options = session.get("last_response", {}).get("options", [])
         user_answer = map_input_to_option(message.text, options)
+        
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
         decision_request = "Now provide ONLY the decision point with exactly 2 options: deep analysis or show result."
         await storage.add_to_history(user_id, {"role": "user", "content": decision_request})
+        
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+        
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
             await message.answer(llm_response["message"])
-            await storage.clear_session(user_id); await state.clear(); return
+            await storage.clear_session(user_id)
+            await state.clear()
+            return
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
-            await handle_emergency(message, state, llm_response); return
-        if llm_response.get("type") not in ["RC-1", "decision_point"]:
-            logger.warning(f"Unexpected type after S3: {llm_response.get('type')}")
-            llm_response["type"] = "RC-1"
-        if "question" not in llm_response or len(llm_response.get("options", [])) != 2:
+            await handle_emergency(message, state, llm_response)
+            return
+        
+        # Force decision point format
+        if llm_response.get("type") not in ["RC-1", "decision_point"] or len(llm_response.get("options", [])) != 2:
             logger.warning(f"LLM skipped decision point, forcing manually")
             decision_options_map = {
                 "ru": ["Глубокий анализ (3 дополнительных вопроса)", "Показать результат сейчас"],
@@ -224,6 +214,7 @@ async def handle_s3(message: Message, state: FSMContext):
                 "question": decision_question_map.get(lang, decision_question_map["en"]),
                 "options": decision_options_map.get(lang, decision_options_map["en"])
             }
+        
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
         await storage.update_session(user_id, {"last_response": llm_response})
         question_text = format_question_with_options(
@@ -241,41 +232,56 @@ async def handle_decision(message: Message, state: FSMContext):
     user_id = message.from_user.id
     if message.text.strip() not in ["1", "2"]:
         return
+    
     try:
         session = await storage.get_session(user_id)
         lang = session.get("language", "en")
         options = session.get("last_response", {}).get("options", [])
         user_answer = map_input_to_option(message.text, options)
+        
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
-        if "1" in message.text:
-            llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-            if llm_response.get("type") == "RATE_LIMIT_ERROR":
-                await message.answer(llm_response["message"])
-                await storage.clear_session(user_id); await state.clear(); return
-            if llm_response.get("type") == "RC-3":
-                from handlers.emergency import handle_emergency
-                await handle_emergency(message, state, llm_response); return
-            if "options" not in llm_response:
-                logger.error(f"RC-1 missing options: {llm_response}")
+        llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+        
+        if llm_response.get("type") == "RATE_LIMIT_ERROR":
+            await message.answer(llm_response["message"])
+            await storage.clear_session(user_id)
+            await state.clear()
+            return
+        if llm_response.get("type") == "RC-3":
+            from handlers.emergency import handle_emergency
+            await handle_emergency(message, state, llm_response)
+            return
+        
+        # Check response type
+        if llm_response.get("type") == "RC-2":
+            # Final verdict
+            if "content" not in llm_response:
+                logger.error(f"RC-2 missing content: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
-            await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
-            await storage.update_session(user_id, {"last_response": llm_response})
-            question_text = format_question_with_options(
-                llm_response["question"], llm_response["options"], question_num=4, total=6, language=lang
-            )
-            await message.answer(question_text)
-            await state.set_state(DiagnosticStates.s4)
+            await send_verdict(message, state, llm_response, user_id, lang)
+        elif llm_response.get("type") == "RC-1":
+            # Next question (S4)
+            if "question" not in llm_response or "options" not in llm_response:
+                logger.error(f"Invalid RC-1 at decision: {llm_response}")
+                await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+                return
+            if "1" in message.text:
+                # User chose deep analysis
+                await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
+                await storage.update_session(user_id, {"last_response": llm_response})
+                question_text = format_question_with_options(
+                    llm_response["question"], llm_response["options"], question_num=4, total=6, language=lang
+                )
+                await message.answer(question_text)
+                await state.set_state(DiagnosticStates.s4)
+            else:
+                # User chose show result but got RC-1 - this is error
+                logger.error(f"Got RC-1 when expecting RC-2 after 'show result'")
+                await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
         else:
-            llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-            if llm_response.get("type") == "RATE_LIMIT_ERROR":
-                await message.answer(llm_response["message"])
-                await storage.clear_session(user_id); await state.clear(); return
-            if llm_response.get("type") == "RC-3":
-                from handlers.emergency import handle_emergency
-                await handle_emergency(message, state, llm_response); return
-            if llm_response.get("type") == "RC-2":
-                await send_verdict(message, state, llm_response, user_id, lang)
+            logger.error(f"Unexpected type at decision: {llm_response.get('type')}")
+            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
     except Exception as e:
         logger.error(f"Error in handle_decision: {e}")
         session = await storage.get_session(user_id) or {}
@@ -293,49 +299,56 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
         "DiagnosticStates:s6": (6, None)
     }
     question_num, next_state = state_map.get(current_state, (4, None))
+    
     try:
         session = await storage.get_session(user_id)
         lang = session.get("language", "en")
         options = session.get("last_response", {}).get("options", [])
         user_answer = map_input_to_option(message.text, options)
+        
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+        
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
             await message.answer(llm_response["message"])
-            await storage.clear_session(user_id); await state.clear(); return
+            await storage.clear_session(user_id)
+            await state.clear()
+            return
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
-            await handle_emergency(message, state, llm_response); return
+            await handle_emergency(message, state, llm_response)
+            return
         
-        # Проверить тип ответа
+        # Determine what to do based on response type and current position
         if llm_response.get("type") == "RC-2":
-            # Это финальный вердикт
+            # Final verdict
             if "content" not in llm_response:
                 logger.error(f"RC-2 missing content: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
             await send_verdict(message, state, llm_response, user_id, lang)
+            
         elif llm_response.get("type") == "RC-1":
-            # Это следующий вопрос
+            # Another question
             if "question" not in llm_response or "options" not in llm_response:
-                logger.error(f"RC-1 missing fields: {llm_response}")
+                logger.error(f"Invalid RC-1 in deep analysis: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
             
-            # Если это был последний вопрос (S6) - должен быть RC-2
+            # If we're at S6 and got RC-1, this is wrong - request final verdict
             if next_state is None:
-                logger.warning(f"Got RC-1 after S6, requesting final verdict")
+                logger.warning("Got RC-1 after S6, auto-answering and requesting RC-2")
                 await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
-                await storage.add_to_history(user_id, {"role": "user", "content": map_input_to_option("1", llm_response["options"])})
-                # Запросить RC-2
+                await storage.add_to_history(user_id, {"role": "user", "content": llm_response["options"][0]})
                 final_response = await llm_client.get_response(await storage.get_history(user_id), lang)
                 if final_response.get("type") == "RC-2" and "content" in final_response:
                     await send_verdict(message, state, final_response, user_id, lang)
                 else:
+                    logger.error(f"Still no RC-2 after S6: {final_response}")
                     await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
             
-            # Иначе продолжаем опрос
+            # Continue with next question
             await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
             await storage.update_session(user_id, {"last_response": llm_response})
             question_text = format_question_with_options(
@@ -345,8 +358,9 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
             await message.answer(question_text)
             await state.set_state(next_state)
         else:
-            logger.error(f"Unexpected response in deep analysis: {llm_response.get('type')}")
+            logger.error(f"Unexpected type in deep analysis: {llm_response.get('type')}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+            
     except Exception as e:
         logger.error(f"Error in handle_deep_analysis: {e}")
         session = await storage.get_session(user_id) or {}
@@ -356,7 +370,6 @@ async def send_verdict(message: Message, state: FSMContext, verdict: dict, user_
     log_verdict(user_id, verdict.get("pattern_label", "Unknown"), language)
     
     text = verdict.get("content", "Анализ недоступен")
-    
     MAX_LENGTH = 4000
     
     if len(text) <= MAX_LENGTH:
