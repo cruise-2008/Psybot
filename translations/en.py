@@ -1,8 +1,6 @@
+# -*- coding: utf-8 -*-
 EN_TEXTS = {
-    "disclaimer": 
-
-🔒 Privacy:
-Data is stored temporarily (1 hour) and deleted automatically. We do not save the content of your answers."""⚠️ Important Information
+    "disclaimer": """⚠️ Important Information
 
 This is NOT a substitute for professional help. This bot provides psychological triage only.
 
@@ -13,7 +11,10 @@ If you're experiencing:
 
 Please seek professional help immediately.
 
-By continuing, you acknowledge this is an informational tool only.""",
+By continuing, you acknowledge this is an informational tool only.
+
+🔒 Privacy:
+Data is stored temporarily (1 hour) and deleted automatically. We do not save the content of your answers.""",
     
     "instructions": """📝 Describe your current situation. Be specific: what's happening, how long, how often.
 

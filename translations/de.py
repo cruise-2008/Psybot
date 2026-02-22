@@ -1,8 +1,6 @@
+# -*- coding: utf-8 -*-
 DE_TEXTS = {
-    "disclaimer": 
-
-🔒 Datenschutz:
-Daten werden vorübergehend (1 Stunde) gespeichert und automatisch gelöscht. Wir speichern den Inhalt Ihrer Antworten nicht."""⚠️ Wichtige Information
+    "disclaimer": """⚠️ Wichtige Information
 
 Dies ist KEIN Ersatz für professionelle Hilfe. Dieser Bot bietet nur psychologische Triage an.
 
@@ -13,7 +11,10 @@ Wenn Sie erleben:
 
 Bitte suchen Sie sofort professionelle Hilfe.
 
-Mit der Fortsetzung bestätigen Sie, dass dies nur ein Informationstool ist.""",
+Mit der Fortsetzung bestätigen Sie, dass dies nur ein Informationstool ist.
+
+🔒 Datenschutz:
+Daten werden vorübergehend (1 Stunde) gespeichert und automatisch gelöscht. Wir speichern den Inhalt Ihrer Antworten nicht.""",
     
     "instructions": """📝 Beschreiben Sie Ihre aktuelle Situation. Seien Sie konkret: was passiert, seit wann, wie oft.
 

@@ -1,8 +1,6 @@
+# -*- coding: utf-8 -*-
 FR_TEXTS = {
-    "disclaimer": 
-
-🔒 Confidentialité:
-Les données sont stockées temporairement (1 heure) et supprimées automatiquement. Nous ne sauvegardons pas le contenu de vos réponses."""⚠️ Information importante
+    "disclaimer": """⚠️ Information importante
 
 Ce n'est PAS un substitut à l'aide professionnelle. Ce bot fournit uniquement un triage psychologique.
 
@@ -13,7 +11,10 @@ Si vous ressentez:
 
 Veuillez demander une aide professionnelle immédiatement.
 
-En continuant, vous reconnaissez qu'il s'agit uniquement d'un outil d'information.""",
+En continuant, vous reconnaissez qu'il s'agit uniquement d'un outil d'information.
+
+🔒 Confidentialité:
+Les données sont stockées temporairement (1 heure) et supprimées automatiquement. Nous ne sauvegardons pas le contenu de vos réponses.""",
     
     "instructions": """📝 Décrivez votre situation actuelle. Soyez précis: ce qui se passe, depuis combien de temps, à quelle fréquence.
 

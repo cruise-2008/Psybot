@@ -1,8 +1,6 @@
+# -*- coding: utf-8 -*-
 ES_TEXTS = {
-    "disclaimer": 
-
-🔒 Privacidad:
-Los datos se almacenan temporalmente (1 hora) y se eliminan automáticamente. No guardamos el contenido de sus respuestas."""⚠️ Información importante
+    "disclaimer": """⚠️ Información importante
 
 Esto NO es un sustituto de la ayuda profesional. Este bot solo proporciona triaje psicológico.
 
@@ -13,7 +11,10 @@ Si estás experimentando:
 
 Por favor, busca ayuda profesional inmediatamente.
 
-Al continuar, reconoces que esta es solo una herramienta informativa.""",
+Al continuar, reconoces que esta es solo una herramienta informativa.
+
+🔒 Privacidad:
+Los datos se almacenan temporalmente (1 hora) y se eliminan automáticamente. No guardamos el contenido de sus respuestas.""",
     
     "instructions": """📝 Describa su situación actual. Sea específico: qué sucede, desde cuándo, con qué frecuencia.
 
