@@ -306,17 +306,36 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
-        if llm_response.get("type") == "RC-2" or next_state is None:
+        
+        # Проверить тип ответа
+        if llm_response.get("type") == "RC-2":
+            # Это финальный вердикт
             if "content" not in llm_response:
                 logger.error(f"RC-2 missing content: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
             await send_verdict(message, state, llm_response, user_id, lang)
-        elif llm_response.get("type") == "RC-1" and "question" in llm_response:
-            if "options" not in llm_response:
-                logger.error(f"RC-1 missing options: {llm_response}")
+        elif llm_response.get("type") == "RC-1":
+            # Это следующий вопрос
+            if "question" not in llm_response or "options" not in llm_response:
+                logger.error(f"RC-1 missing fields: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
+            
+            # Если это был последний вопрос (S6) - должен быть RC-2
+            if next_state is None:
+                logger.warning(f"Got RC-1 after S6, requesting final verdict")
+                await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
+                await storage.add_to_history(user_id, {"role": "user", "content": map_input_to_option("1", llm_response["options"])})
+                # Запросить RC-2
+                final_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+                if final_response.get("type") == "RC-2" and "content" in final_response:
+                    await send_verdict(message, state, final_response, user_id, lang)
+                else:
+                    await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+                return
+            
+            # Иначе продолжаем опрос
             await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
             await storage.update_session(user_id, {"last_response": llm_response})
             question_text = format_question_with_options(
