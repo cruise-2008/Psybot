@@ -74,12 +74,12 @@ class LLMClient:
 
 User's language: {user_language}. Respond in this language.
 
-CRITICAL JSON RULES:
-1. NO quotes inside field values - rephrase to avoid them
-2. Example WRONG: "When you say \\"I must accept\\""
-3. Example RIGHT: "When you say you must accept the situation"
-4. NO markdown fences
-5. Keep text concise"""
+CRITICAL JSON RULE:
+Inside field values, ALWAYS use single quotes ' for any quoted text, NEVER double quotes "
+Example CORRECT: "When you say 'I must accept'"
+Example WRONG: "When you say \\"I must accept\\""
+NO markdown fences
+Keep text concise"""
 
         history_text = ""
         for msg in conversation_history:
@@ -101,10 +101,6 @@ CRITICAL JSON RULES:
             content = content[:-3]
 
         content = content.strip()
-
-        # Fix apostrophes (English + French)
-        content = re.sub(r'(\w)"(s|m|t|re|ve|ll|d)\b', r"\1'\2", content)
-        content = re.sub(r'\b([JjDdLlQqMmTtSsNnCc])"(\w)', r"\1'\2", content)
 
         if not content.endswith("}"):
             logger.warning("Response appears truncated")
