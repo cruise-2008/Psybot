@@ -31,9 +31,9 @@ RC-3 (Emergency):
 DIAGNOSTIC PROCESS:
 - S0: User describes situation
 - S1-S3: Three questions focusing on USER's internal state
-- Decision Point: Offer deep analysis or show result
-- S4-S6: Optional deeper questions
-- RC-2: Final verdict
+- Decision Point: {"type":"RC-1","question":"Analysis complete. / Анализ завершен. / Análisis completo. / Analyse terminée. / Analyse abgeschlossen.","options":["Deep analysis / Глубокий анализ / Análisis profundo / Analyse approfondie / Tiefenanalyse","Show result / Показать результат / Mostrar resultado / Afficher le résultat / Ergebnis anzeigen"]}
+- S4-S6: Optional deeper questions if user chooses option 1
+- RC-2: Final verdict if user chooses option 2 OR after S6
 
 QUESTION DESIGN (S1-S6):
 - ALWAYS focus on USER, not third parties
@@ -42,8 +42,11 @@ QUESTION DESIGN (S1-S6):
 - Identify USER's cognitive distortions
 - Options must be about USER's internal experience
 
-DECISION POINT:
-After S3: {"type":"RC-1","question":"Analysis complete.","options":["Deep analysis","Show result"]}
+DECISION POINT CRITICAL:
+After S3, you MUST provide decision point with EXACTLY this structure in user's language:
+- Question: "Analysis complete." (translate to user's language)
+- Options array with EXACTLY 2 options (translate to user's language):
+  ["Deep analysis", "Show result"]
 
 ---
 

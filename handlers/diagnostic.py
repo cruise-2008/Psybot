@@ -196,11 +196,11 @@ async def handle_s3(message: Message, state: FSMContext):
         if llm_response.get("type") not in ["RC-1", "decision_point"] or len(llm_response.get("options", [])) != 2:
             logger.warning(f"LLM skipped decision point, forcing manually")
             decision_options_map = {
-                "ru": ["Глубокий анализ (3 дополнительных вопроса)", "Показать результат сейчас"],
-                "en": ["Deep analysis (3 additional questions)", "Show result now"],
-                "es": ["Análisis profundo (3 preguntas adicionales)", "Mostrar resultado ahora"],
-                "fr": ["Analyse approfondie (3 questions supplémentaires)", "Afficher le résultat maintenant"],
-                "de": ["Tiefenanalyse (3 zusätzliche Fragen)", "Ergebnis jetzt anzeigen"]
+                "ru": ["Глубокий анализ", "Показать результат"],
+                "en": ["Deep analysis", "Show result"],
+                "es": ["Análisis profundo", "Mostrar resultado"],
+                "fr": ["Analyse approfondie", "Afficher le résultat"],
+                "de": ["Tiefenanalyse", "Ergebnis anzeigen"]
             }
             decision_question_map = {
                 "ru": "Анализ завершен.",
