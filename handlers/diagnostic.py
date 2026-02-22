@@ -131,6 +131,12 @@ async def handle_s1(message: Message, state: FSMContext):
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
+        
+        # Проверка наличия обязательных полей
+        if llm_response.get("type") == "RC-1" and "options" not in llm_response:
+            logger.error(f"RC-1 missing options field: {llm_response}")
+            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+            return
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
         await storage.update_session(user_id, {"last_response": llm_response})
         question_text = format_question_with_options(
@@ -159,6 +165,12 @@ async def handle_s2(message: Message, state: FSMContext):
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
+        
+        # Проверка наличия обязательных полей
+        if llm_response.get("type") == "RC-1" and "options" not in llm_response:
+            logger.error(f"RC-1 missing options field: {llm_response}")
+            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+            return
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
         await storage.update_session(user_id, {"last_response": llm_response})
         question_text = format_question_with_options(
@@ -189,6 +201,12 @@ async def handle_s3(message: Message, state: FSMContext):
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
+        
+        # Проверка наличия обязательных полей
+        if llm_response.get("type") == "RC-1" and "options" not in llm_response:
+            logger.error(f"RC-1 missing options field: {llm_response}")
+            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+            return
         
         # Проверить что это decision_point или RC-1
         if llm_response.get("type") not in ["RC-1", "decision_point"]:
@@ -298,6 +316,12 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
         
+        # Проверка наличия обязательных полей
+        if llm_response.get("type") == "RC-1" and "options" not in llm_response:
+            logger.error(f"RC-1 missing options field: {llm_response}")
+            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+            return
+        
         # Проверить тип ответа
         if llm_response.get("type") == "RC-2" or next_state is None:
             # Финальный вердикт
@@ -327,10 +351,41 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
 async def send_verdict(message: Message, state: FSMContext, verdict: dict, user_id: int, language: str):
     log_verdict(user_id, verdict.get("pattern_label", "Unknown"), language)
     
-    # Новый формат: просто content field с markdown
     text = verdict.get("content", "Анализ недоступен")
     
-    await message.answer(text, parse_mode="Markdown")
+    # Telegram limit: 4096 characters
+    MAX_LENGTH = 4000  # Leave margin for formatting
+    
+    if len(text) <= MAX_LENGTH:
+        await message.answer(text, parse_mode="Markdown")
+    else:
+        # Split by sections (markdown headers)
+        parts = []
+        current_part = ""
+        
+        for line in text.split('
+'):
+            if len(current_part) + len(line) + 1 > MAX_LENGTH:
+                if current_part:
+                    parts.append(current_part)
+                current_part = line + '
+'
+            else:
+                current_part += line + '
+'
+        
+        if current_part:
+            parts.append(current_part)
+        
+        # Send parts
+        for i, part in enumerate(parts):
+            if i == 0:
+                await message.answer(part, parse_mode="Markdown")
+            else:
+                await message.answer(f"_(продолжение {i+1})_
+
+{part}", parse_mode="Markdown")
+    
     await storage.clear_session(user_id)
     await state.clear()
     end_msg = SESSION_ENDED_MESSAGES.get(language, SESSION_ENDED_MESSAGES["en"])
