@@ -1,5 +1,8 @@
 FR_TEXTS = {
-    "disclaimer": """⚠️ Information importante
+    "disclaimer": 
+
+🔒 Confidentialité:
+Les données sont stockées temporairement (1 heure) et supprimées automatiquement. Nous ne sauvegardons pas le contenu de vos réponses."""⚠️ Information importante
 
 Ce n'est PAS un substitut à l'aide professionnelle. Ce bot fournit uniquement un triage psychologique.
 

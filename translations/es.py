@@ -1,5 +1,8 @@
 ES_TEXTS = {
-    "disclaimer": """⚠️ Información importante
+    "disclaimer": 
+
+🔒 Privacidad:
+Los datos se almacenan temporalmente (1 hora) y se eliminan automáticamente. No guardamos el contenido de sus respuestas."""⚠️ Información importante
 
 Esto NO es un sustituto de la ayuda profesional. Este bot solo proporciona triaje psicológico.
 

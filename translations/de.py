@@ -1,5 +1,8 @@
 DE_TEXTS = {
-    "disclaimer": """⚠️ Wichtige Information
+    "disclaimer": 
+
+🔒 Datenschutz:
+Daten werden vorübergehend (1 Stunde) gespeichert und automatisch gelöscht. Wir speichern den Inhalt Ihrer Antworten nicht."""⚠️ Wichtige Information
 
 Dies ist KEIN Ersatz für professionelle Hilfe. Dieser Bot bietet nur psychologische Triage an.
 

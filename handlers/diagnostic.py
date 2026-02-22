@@ -307,6 +307,12 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
         user_answer = map_input_to_option(message.text, options)
         
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
+        
+        # If this is S6, explicitly request final verdict
+        if next_state is None:
+            verdict_request = "Now provide the final RC-2 verdict with complete analysis. This is after S6, the last question."
+            await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
+        
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
         
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
@@ -319,9 +325,7 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
             await handle_emergency(message, state, llm_response)
             return
         
-        # Determine what to do based on response type and current position
         if llm_response.get("type") == "RC-2":
-            # Final verdict
             if "content" not in llm_response:
                 logger.error(f"RC-2 missing content: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
@@ -329,26 +333,24 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
             await send_verdict(message, state, llm_response, user_id, lang)
             
         elif llm_response.get("type") == "RC-1":
-            # Another question
             if "question" not in llm_response or "options" not in llm_response:
                 logger.error(f"Invalid RC-1 in deep analysis: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
             
-            # If we're at S6 and got RC-1, this is wrong - request final verdict
             if next_state is None:
-                logger.warning("Got RC-1 after S6, auto-answering and requesting RC-2")
+                logger.error("Got RC-1 after S6 - forcing final verdict")
                 await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
                 await storage.add_to_history(user_id, {"role": "user", "content": llm_response["options"][0]})
+                await storage.add_to_history(user_id, {"role": "user", "content": "Now provide RC-2 final verdict."})
                 final_response = await llm_client.get_response(await storage.get_history(user_id), lang)
                 if final_response.get("type") == "RC-2" and "content" in final_response:
                     await send_verdict(message, state, final_response, user_id, lang)
                 else:
-                    logger.error(f"Still no RC-2 after S6: {final_response}")
+                    logger.error(f"Still no RC-2: {final_response}")
                     await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
             
-            # Continue with next question
             await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
             await storage.update_session(user_id, {"last_response": llm_response})
             question_text = format_question_with_options(
@@ -358,7 +360,7 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
             await message.answer(question_text)
             await state.set_state(next_state)
         else:
-            logger.error(f"Unexpected type in deep analysis: {llm_response.get('type')}")
+            logger.error(f"Unexpected type: {llm_response.get('type')}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
             
     except Exception as e:

@@ -30,6 +30,8 @@ def log_session(user_id: int, language: str, pattern_label: str = None):
         f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
 def log_verdict(user_id: int, pattern_label: str, language: str):
+    return  # Disabled for EU compliance
+    """
     """Логирование вердикта в verdicts.jsonl"""
     log_entry = {
         "timestamp": datetime.utcnow().isoformat(),
@@ -38,6 +40,7 @@ def log_verdict(user_id: int, pattern_label: str, language: str):
         "pattern_label": pattern_label,
         "language": language
     }
+    """
     with open(LOGS_DIR / "verdicts.jsonl", "a", encoding='utf-8') as f:
         f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
