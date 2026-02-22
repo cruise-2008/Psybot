@@ -3,20 +3,41 @@ import json
 import hashlib
 from datetime import datetime
 from pathlib import Path
+from cryptography.fernet import Fernet
+import os
 
 LOGS_DIR = Path("logs")
 LOGS_DIR.mkdir(exist_ok=True)
 
-# Salt для хеширования (должен быть в .env в продакшене)
-LOG_SALT = "diagnostic_bot_salt_2026"
+# Generate or load encryption key
+KEY_FILE = LOGS_DIR / ".log_key"
+if KEY_FILE.exists():
+    with open(KEY_FILE, "rb") as f:
+        ENCRYPTION_KEY = f.read()
+else:
+    ENCRYPTION_KEY = Fernet.generate_key()
+    with open(KEY_FILE, "wb") as f:
+        f.write(ENCRYPTION_KEY)
+    os.chmod(KEY_FILE, 0o600)  # Read/write for owner only
+
+cipher = Fernet(ENCRYPTION_KEY)
+
+# Salt for hashing (change this to random value in production)
+SALT = os.getenv("LOG_SALT", "psybot_salt_2026").encode()
 
 def hash_user_id(user_id: int) -> str:
-    """Хеширует user_id с солью для анонимизации"""
-    salted = f"{user_id}{LOG_SALT}".encode('utf-8')
-    return hashlib.sha256(salted).hexdigest()[:16]
+    """Convert user_id to salted hash for anonymization"""
+    data = f"{user_id}".encode() + SALT
+    return hashlib.sha256(data).hexdigest()[:16]
+
+def encrypt_log_entry(log_entry: dict) -> str:
+    """Encrypt log entry"""
+    json_str = json.dumps(log_entry, ensure_ascii=False)
+    encrypted = cipher.encrypt(json_str.encode())
+    return encrypted.decode()
 
 def setup_logging():
-    """Настройка основного логгера"""
+    """Setup basic logging"""
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -26,38 +47,29 @@ def setup_logging():
         ]
     )
 
-def log_session(user_id: int, language: str, pattern_label: str = None):
-    """Логирование сессии (анонимизированное)"""
-    log_entry = {
-        "timestamp": datetime.utcnow().isoformat(),
-        "user_hash": hash_user_id(user_id),
-        "language": language,
-        "pattern_label": pattern_label
-    }
-    with open(LOGS_DIR / "sessions.jsonl", "a", encoding='utf-8') as f:
-        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
-
 def log_verdict(user_id: int, pattern_label: str, language: str):
-    """Логирование вердикта (анонимизированное, только метаданные)"""
+    """Log verdict with hashed user_id and encrypted data"""
     log_entry = {
         "timestamp": datetime.utcnow().isoformat(),
-        "user_hash": hash_user_id(user_id),
+        "user_id_hash": hash_user_id(user_id),
         "type": "verdict",
         "pattern_label": pattern_label,
         "language": language
     }
+    encrypted_entry = encrypt_log_entry(log_entry)
     with open(LOGS_DIR / "verdicts.jsonl", "a", encoding='utf-8') as f:
-        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+        f.write(encrypted_entry + "\n")
 
 def log_emergency(user_id: int, code: str, trigger: str, language: str):
-    """Логирование emergency (анонимизированное)"""
+    """Log emergency with hashed user_id and encrypted data"""
     log_entry = {
         "timestamp": datetime.utcnow().isoformat(),
-        "user_hash": hash_user_id(user_id),
+        "user_id_hash": hash_user_id(user_id),
         "type": "emergency",
         "code": code,
-        "trigger_length": len(trigger),  # Только длина, не содержание
+        "trigger": trigger[:100],  # Truncate trigger to avoid PII
         "language": language
     }
+    encrypted_entry = encrypt_log_entry(log_entry)
     with open(LOGS_DIR / "emergencies.jsonl", "a", encoding='utf-8') as f:
-        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+        f.write(encrypted_entry + "\n")
