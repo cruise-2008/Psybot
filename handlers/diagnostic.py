@@ -142,6 +142,22 @@ async def handle_question(message: Message, state: FSMContext, next_state, quest
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response)
             return
+        
+        # Check if got RC-2 prematurely (before S3)
+        if llm_response.get("type") == "RC-2" and question_num < 3:
+            logger.warning(f"Got premature RC-2 at S{question_num}, requesting next question")
+            request = f"Continue with question S{question_num+1}. Do NOT provide final verdict yet. Ask the next diagnostic question with 4 options."
+            await storage.add_to_history(user_id, {"role": "user", "content": request})
+            llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+            # If still RC-2, give up and use it
+            if llm_response.get("type") == "RC-2":
+                logger.error(f"LLM insists on RC-2 at S{question_num}, accepting it")
+                if "content" in llm_response:
+                    await send_verdict(message, state, llm_response, user_id, lang)
+                else:
+                    await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+                return
+        
         if llm_response.get("type") != "RC-1" or "question" not in llm_response or "options" not in llm_response:
             logger.error(f"Invalid RC-1 response at S{question_num}: {llm_response}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
