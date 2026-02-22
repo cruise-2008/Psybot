@@ -98,6 +98,10 @@ async def start_diagnostic(message: Message, state: FSMContext, s0_text: str):
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response)
             return
+        if "options" not in llm_response:
+            logger.error(f"RC-1 missing options: {llm_response}")
+            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+            return
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
         await storage.update_session(user_id, {"last_response": llm_response})
         question_text = format_question_with_options(
@@ -109,8 +113,7 @@ async def start_diagnostic(message: Message, state: FSMContext, s0_text: str):
     except Exception as e:
         logger.error(f"Error in start_diagnostic: {e}")
         session = await storage.get_session(user_id) or {}
-        error_msg = ERROR_MESSAGES.get(session.get("language", "en"), ERROR_MESSAGES["en"])
-        await message.answer(error_msg)
+        await message.answer(ERROR_MESSAGES.get(session.get("language", "en"), ERROR_MESSAGES["en"]))
 
 @router.message(DiagnosticStates.s1)
 async def handle_s1(message: Message, state: FSMContext):
@@ -131,10 +134,8 @@ async def handle_s1(message: Message, state: FSMContext):
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
-        
-        # Проверка наличия обязательных полей
-        if llm_response.get("type") == "RC-1" and "options" not in llm_response:
-            logger.error(f"RC-1 missing options field: {llm_response}")
+        if "options" not in llm_response:
+            logger.error(f"RC-1 missing options: {llm_response}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
             return
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
@@ -165,10 +166,8 @@ async def handle_s2(message: Message, state: FSMContext):
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
-        
-        # Проверка наличия обязательных полей
-        if llm_response.get("type") == "RC-1" and "options" not in llm_response:
-            logger.error(f"RC-1 missing options field: {llm_response}")
+        if "options" not in llm_response:
+            logger.error(f"RC-1 missing options: {llm_response}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
             return
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
@@ -201,21 +200,11 @@ async def handle_s3(message: Message, state: FSMContext):
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
-        
-        # Проверка наличия обязательных полей
-        if llm_response.get("type") == "RC-1" and "options" not in llm_response:
-            logger.error(f"RC-1 missing options field: {llm_response}")
-            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
-            return
-        
-        # Проверить что это decision_point или RC-1
         if llm_response.get("type") not in ["RC-1", "decision_point"]:
             logger.warning(f"Unexpected type after S3: {llm_response.get('type')}")
             llm_response["type"] = "RC-1"
-        
-        # Если нет question field, создать вручную
         if "question" not in llm_response or len(llm_response.get("options", [])) != 2:
-            logger.warning(f"LLM skipped decision point, forcing manually for user {user_id}")
+            logger.warning(f"LLM skipped decision point, forcing manually")
             decision_options_map = {
                 "ru": ["Глубокий анализ (3 дополнительных вопроса)", "Показать результат сейчас"],
                 "en": ["Deep analysis (3 additional questions)", "Show result now"],
@@ -235,7 +224,6 @@ async def handle_s3(message: Message, state: FSMContext):
                 "question": decision_question_map.get(lang, decision_question_map["en"]),
                 "options": decision_options_map.get(lang, decision_options_map["en"])
             }
-        
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
         await storage.update_session(user_id, {"last_response": llm_response})
         question_text = format_question_with_options(
@@ -267,6 +255,10 @@ async def handle_decision(message: Message, state: FSMContext):
             if llm_response.get("type") == "RC-3":
                 from handlers.emergency import handle_emergency
                 await handle_emergency(message, state, llm_response); return
+            if "options" not in llm_response:
+                logger.error(f"RC-1 missing options: {llm_response}")
+                await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+                return
             await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
             await storage.update_session(user_id, {"last_response": llm_response})
             question_text = format_question_with_options(
@@ -301,7 +293,6 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
         "DiagnosticStates:s6": (6, None)
     }
     question_num, next_state = state_map.get(current_state, (4, None))
-    logger.info(f"Deep analysis: user {user_id}, state={current_state}, q={question_num}")
     try:
         session = await storage.get_session(user_id)
         lang = session.get("language", "en")
@@ -315,23 +306,17 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
         if llm_response.get("type") == "RC-3":
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response); return
-        
-        # Проверка наличия обязательных полей
-        if llm_response.get("type") == "RC-1" and "options" not in llm_response:
-            logger.error(f"RC-1 missing options field: {llm_response}")
-            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
-            return
-        
-        # Проверить тип ответа
         if llm_response.get("type") == "RC-2" or next_state is None:
-            # Финальный вердикт
             if "content" not in llm_response:
-                logger.error(f"RC-2 missing content field: {llm_response}")
+                logger.error(f"RC-2 missing content: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
             await send_verdict(message, state, llm_response, user_id, lang)
         elif llm_response.get("type") == "RC-1" and "question" in llm_response:
-            # Следующий вопрос
+            if "options" not in llm_response:
+                logger.error(f"RC-1 missing options: {llm_response}")
+                await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+                return
             await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
             await storage.update_session(user_id, {"last_response": llm_response})
             question_text = format_question_with_options(
@@ -341,7 +326,7 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
             await message.answer(question_text)
             await state.set_state(next_state)
         else:
-            logger.error(f"Unexpected response type in deep analysis: {llm_response.get('type')}")
+            logger.error(f"Unexpected response in deep analysis: {llm_response.get('type')}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
     except Exception as e:
         logger.error(f"Error in handle_deep_analysis: {e}")
@@ -353,38 +338,30 @@ async def send_verdict(message: Message, state: FSMContext, verdict: dict, user_
     
     text = verdict.get("content", "Анализ недоступен")
     
-    # Telegram limit: 4096 characters
-    MAX_LENGTH = 4000  # Leave margin for formatting
+    MAX_LENGTH = 4000
     
     if len(text) <= MAX_LENGTH:
         await message.answer(text, parse_mode="Markdown")
     else:
-        # Split by sections (markdown headers)
         parts = []
         current_part = ""
         
-        for line in text.split('
-'):
+        for line in text.split('\n'):
             if len(current_part) + len(line) + 1 > MAX_LENGTH:
                 if current_part:
                     parts.append(current_part)
-                current_part = line + '
-'
+                current_part = line + '\n'
             else:
-                current_part += line + '
-'
+                current_part += line + '\n'
         
         if current_part:
             parts.append(current_part)
         
-        # Send parts
         for i, part in enumerate(parts):
             if i == 0:
                 await message.answer(part, parse_mode="Markdown")
             else:
-                await message.answer(f"_(продолжение {i+1})_
-
-{part}", parse_mode="Markdown")
+                await message.answer(f"_(продолжение {i+1})_\n\n{part}", parse_mode="Markdown")
     
     await storage.clear_session(user_id)
     await state.clear()
