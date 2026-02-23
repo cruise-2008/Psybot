@@ -222,7 +222,7 @@ async def handle_s3(message: Message, state: FSMContext):
                 # Split if too long
                 parts = []
                 current_part = ""
-                for line in text.split('
+                for line in text.split('\n')
 '):
                     if len(current_part) + len(line) + 1 > MAX_LENGTH:
                         if current_part:
@@ -413,7 +413,7 @@ async def send_verdict(message: Message, state: FSMContext, verdict: dict, user_
         parts = []
         current_part = ""
         
-        for line in text.split('\n'):
+        for line in text.split('\n')\n'):
             if len(current_part) + len(line) + 1 > MAX_LENGTH:
                 if current_part:
                     parts.append(current_part)
