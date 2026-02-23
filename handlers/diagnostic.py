@@ -190,7 +190,8 @@ async def handle_s3(message: Message, state: FSMContext):
         user_answer = map_input_to_option(message.text, options)
         
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
-        verdict_request = "Now provide RC-2 Verdict 1 (80-100 words): МЕХАНИЗМ, ТРИГГЕР, СКРЫТАЯ ВЫГОДА, ТВОЙ ТИП (2-3 words), ВОПРОС about deep analysis."
+        
+        verdict_request = "CRITICAL: This is after S3. You MUST provide RC-2 Verdict 1 now (80-100 words with МЕХАНИЗМ, ТРИГГЕР, СКРЫТАЯ ВЫГОДА, ТВОЙ ТИП). Do NOT ask another question."
         await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
         
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
@@ -205,6 +206,13 @@ async def handle_s3(message: Message, state: FSMContext):
             await handle_emergency(message, state, llm_response)
             return
         
+        # If got RC-1 instead of RC-2, force it
+        if llm_response.get("type") == "RC-1":
+            logger.error("Got RC-1 instead of RC-2 after S3, forcing verdict")
+            force_request = "You must provide RC-2 Verdict 1 immediately. No more questions. Provide the verdict based on S1-S3 answers."
+            await storage.add_to_history(user_id, {"role": "user", "content": force_request})
+            llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+        
         if llm_response.get("type") == "RC-2" and "content" in llm_response:
             text = llm_response["content"]
             MAX_LENGTH = 4000
@@ -214,27 +222,32 @@ async def handle_s3(message: Message, state: FSMContext):
             else:
                 parts = []
                 current_part = ""
-                for line in text.split('\n'):
+                for line in text.split('
+'):
                     if len(current_part) + len(line) + 1 > MAX_LENGTH:
                         if current_part:
                             parts.append(current_part)
-                        current_part = line + '\n'
+                        current_part = line + '
+'
                     else:
-                        current_part += line + '\n'
+                        current_part += line + '
+'
                 if current_part:
                     parts.append(current_part)
                 for i, part in enumerate(parts):
                     if i == 0:
                         await message.answer(part, parse_mode="Markdown")
                     else:
-                        await message.answer(f"_(продолжение {i+1})_\n\n{part}", parse_mode="Markdown")
+                        await message.answer(f"_(продолжение {i+1})_
+
+{part}", parse_mode="Markdown")
             
-            decision_request = "Now ask decision point: Continue to deep analysis (3 more questions) or describe another situation?"
+            decision_request = "Now ask decision point with 2 options: deep analysis OR describe another situation. Use exact format from prompt."
             await storage.add_to_history(user_id, {"role": "user", "content": decision_request})
             
             decision_response = await llm_client.get_response(await storage.get_history(user_id), lang)
             
-            if decision_response.get("type") == "RC-1" and "question" in decision_response and "options" in decision_response:
+            if decision_response.get("type") == "RC-1" and len(decision_response.get("options", [])) == 2:
                 await storage.add_to_history(user_id, {"role": "assistant", "content": decision_response["question"]})
                 await storage.update_session(user_id, {"last_response": decision_response})
                 question_text = format_question_with_options(
@@ -243,10 +256,10 @@ async def handle_s3(message: Message, state: FSMContext):
                 await message.answer(question_text)
                 await state.set_state(DiagnosticStates.decision_point)
             else:
-                logger.error(f"Expected RC-1 decision point, got: {decision_response.get('type')}")
+                logger.error(f"Expected RC-1 decision point with 2 options, got: {decision_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
         else:
-            logger.error(f"Expected RC-2 Verdict 1 after S3, got: {llm_response.get('type')}")
+            logger.error(f"Still no RC-2 after forcing: {llm_response.get('type')}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
             
     except Exception as e:
