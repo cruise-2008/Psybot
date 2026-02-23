@@ -194,7 +194,6 @@ async def handle_s3(message: Message, state: FSMContext):
         
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
         
-        # Request Verdict 1 immediately after S3
         verdict_request = "Now provide RC-2 Verdict 1 (80-100 words): МЕХАНИЗМ, ТРИГГЕР, СКРЫТАЯ ВЫГОДА, ТВОЙ ТИП (2-3 words), ВОПРОС about deep analysis."
         await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
         
@@ -210,40 +209,38 @@ async def handle_s3(message: Message, state: FSMContext):
             await handle_emergency(message, state, llm_response)
             return
         
-        # Expect RC-2 (Verdict 1)
         if llm_response.get("type") == "RC-2" and "content" in llm_response:
-            # Send Verdict 1
             text = llm_response["content"]
             MAX_LENGTH = 4000
             
             if len(text) <= MAX_LENGTH:
                 await message.answer(text, parse_mode="Markdown")
             else:
-                # Split if too long
                 parts = []
                 current_part = ""
-                for line in text.split('\n')
-'):
+                lines = text.split("
+")
+                for line in lines:
                     if len(current_part) + len(line) + 1 > MAX_LENGTH:
                         if current_part:
                             parts.append(current_part)
-                        current_part = line + '
-'
+                        current_part = line + "
+"
                     else:
-                        current_part += line + '
-'
+                        current_part += line + "
+"
                 if current_part:
                     parts.append(current_part)
                 for i, part in enumerate(parts):
                     if i == 0:
                         await message.answer(part, parse_mode="Markdown")
                     else:
-                        await message.answer(f"_(продолжение {i+1})_
+                        continuation = f"_(продолжение {i+1})_
 
-{part}", parse_mode="Markdown")
+{part}"
+                        await message.answer(continuation, parse_mode="Markdown")
             
-            # Now ask decision point
-            decision_request = "Now ask decision point: Continue to deep analysis (3 more questions) or stop here?"
+            decision_request = "Now ask decision point: Continue to deep analysis (3 more questions) or describe another situation?"
             await storage.add_to_history(user_id, {"role": "user", "content": decision_request})
             
             decision_response = await llm_client.get_response(await storage.get_history(user_id), lang)
