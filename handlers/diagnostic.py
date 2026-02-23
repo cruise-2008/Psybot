@@ -2,10 +2,8 @@ from aiogram import Router, F
 from aiogram.types import Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-
 import logging
 logger = logging.getLogger(__name__)
-
 from services.llm_client import llm_client
 from services.redis_storage import storage
 from services.logger import log_verdict
@@ -45,20 +43,8 @@ def format_question_with_options(question: str, options: list, question_num: int
         "fr": f"💬 Écrivez le numéro (1-{len(options)}) et/ou votre réponse:",
         "de": f"💬 Schreiben Sie die Nummer (1-{len(options)}) und/oder Ihre Antwort:"
     }
-    decision_prompts = {
-        "ru": "💬 Напишите номер (1-2):",
-        "en": "💬 Write number (1-2):",
-        "es": "💬 Escriba el número (1-2):",
-        "fr": "💬 Écrivez le numéro (1-2):",
-        "de": "💬 Schreiben Sie die Nummer (1-2):"
-    }
-    question_labels = {
-        "ru": f"Вопрос {question_num}/{total}:",
-        "en": f"Question {question_num}/{total}:",
-        "es": f"Pregunta {question_num}/{total}:",
-        "fr": f"Question {question_num}/{total}:",
-        "de": f"Frage {question_num}/{total}:"
-    }
+    decision_prompts = {"ru": "💬 Напишите номер (1-2):", "en": "💬 Write number (1-2):", "es": "💬 Escriba el número (1-2):", "fr": "💬 Écrivez le numéro (1-2):", "de": "💬 Schreiben Sie die Nummer (1-2):"}
+    question_labels = {"ru": f"Вопрос {question_num}/{total}:", "en": f"Question {question_num}/{total}:", "es": f"Pregunta {question_num}/{total}:", "fr": f"Question {question_num}/{total}:", "de": f"Frage {question_num}/{total}:"}
     formatted_options = "\n".join([f"{i+1}. {opt}" for i, opt in enumerate(options)])
     if question_num == 0:
         prompt = decision_prompts.get(language, decision_prompts["en"])
@@ -89,7 +75,6 @@ async def start_diagnostic(message: Message, state: FSMContext, s0_text: str):
         lang = session.get("language", "en")
         await storage.add_to_history(user_id, {"role": "user", "content": s0_text})
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-        
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
             await message.answer(llm_response["message"])
             await storage.clear_session(user_id)
@@ -103,12 +88,9 @@ async def start_diagnostic(message: Message, state: FSMContext, s0_text: str):
             logger.error(f"Invalid S1 response: {llm_response}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
             return
-            
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
         await storage.update_session(user_id, {"last_response": llm_response})
-        question_text = format_question_with_options(
-            llm_response["question"], llm_response["options"], question_num=1, language=lang
-        )
+        question_text = format_question_with_options(llm_response["question"], llm_response["options"], question_num=1, language=lang)
         await message.answer(question_text)
         await state.set_state(DiagnosticStates.s1)
         logger.info(f"User {user_id} started diagnostic with S1")
@@ -124,14 +106,11 @@ async def handle_question(message: Message, state: FSMContext, next_state, quest
         if not session:
             await message.answer("Сессия истекла. Используйте /start")
             return
-        
         lang = session.get("language", "en")
         options = session.get("last_response", {}).get("options", [])
         user_answer = map_input_to_option(message.text, options)
-        
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-        
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
             await message.answer(llm_response["message"])
             await storage.clear_session(user_id)
@@ -141,7 +120,6 @@ async def handle_question(message: Message, state: FSMContext, next_state, quest
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response)
             return
-        
         if llm_response.get("type") == "RC-2" and question_num < 3:
             logger.warning(f"Got premature RC-2 at S{question_num}, requesting next question")
             request = f"Continue with question S{question_num+1}. Do NOT provide final verdict yet. Ask the next diagnostic question with 4 options."
@@ -154,17 +132,13 @@ async def handle_question(message: Message, state: FSMContext, next_state, quest
                 else:
                     await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
-        
         if llm_response.get("type") != "RC-1" or "question" not in llm_response or "options" not in llm_response:
             logger.error(f"Invalid RC-1 response at S{question_num}: {llm_response}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
             return
-        
         await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
         await storage.update_session(user_id, {"last_response": llm_response})
-        question_text = format_question_with_options(
-            llm_response["question"], llm_response["options"], question_num=question_num+1, language=lang
-        )
+        question_text = format_question_with_options(llm_response["question"], llm_response["options"], question_num=question_num+1, language=lang)
         await message.answer(question_text)
         await state.set_state(next_state)
     except Exception as e:
@@ -188,14 +162,10 @@ async def handle_s3(message: Message, state: FSMContext):
         lang = session.get("language", "en")
         options = session.get("last_response", {}).get("options", [])
         user_answer = map_input_to_option(message.text, options)
-        
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
-        
         verdict_request = "CRITICAL: This is after S3. You MUST provide RC-2 Verdict 1 now (80-100 words with МЕХАНИЗМ, ТРИГГЕР, СКРЫТАЯ ВЫГОДА, ТВОЙ ТИП). Do NOT ask another question."
         await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
-        
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-        
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
             await message.answer(llm_response["message"])
             await storage.clear_session(user_id)
@@ -205,54 +175,41 @@ async def handle_s3(message: Message, state: FSMContext):
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response)
             return
-        
-        # If got RC-1 instead of RC-2, force it
         if llm_response.get("type") == "RC-1":
             logger.error("Got RC-1 instead of RC-2 after S3, forcing verdict")
             force_request = "You must provide RC-2 Verdict 1 immediately. No more questions. Provide the verdict based on S1-S3 answers."
             await storage.add_to_history(user_id, {"role": "user", "content": force_request})
             llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-        
         if llm_response.get("type") == "RC-2" and "content" in llm_response:
             text = llm_response["content"]
             MAX_LENGTH = 4000
-            
             if len(text) <= MAX_LENGTH:
                 await message.answer(text, parse_mode="Markdown")
             else:
                 parts = []
                 current_part = ""
-                for line in text.split('
-'):
+                text_lines = text.split('\n')
+                for line in text_lines:
                     if len(current_part) + len(line) + 1 > MAX_LENGTH:
                         if current_part:
                             parts.append(current_part)
-                        current_part = line + '
-'
+                        current_part = line + '\n'
                     else:
-                        current_part += line + '
-'
+                        current_part += line + '\n'
                 if current_part:
                     parts.append(current_part)
                 for i, part in enumerate(parts):
                     if i == 0:
                         await message.answer(part, parse_mode="Markdown")
                     else:
-                        await message.answer(f"_(продолжение {i+1})_
-
-{part}", parse_mode="Markdown")
-            
+                        await message.answer(f"_(продолжение {i+1})_\n\n{part}", parse_mode="Markdown")
             decision_request = "Now ask decision point with 2 options: deep analysis OR describe another situation. Use exact format from prompt."
             await storage.add_to_history(user_id, {"role": "user", "content": decision_request})
-            
             decision_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-            
             if decision_response.get("type") == "RC-1" and len(decision_response.get("options", [])) == 2:
                 await storage.add_to_history(user_id, {"role": "assistant", "content": decision_response["question"]})
                 await storage.update_session(user_id, {"last_response": decision_response})
-                question_text = format_question_with_options(
-                    decision_response["question"], decision_response["options"], question_num=0, language=lang
-                )
+                question_text = format_question_with_options(decision_response["question"], decision_response["options"], question_num=0, language=lang)
                 await message.answer(question_text)
                 await state.set_state(DiagnosticStates.decision_point)
             else:
@@ -261,7 +218,6 @@ async def handle_s3(message: Message, state: FSMContext):
         else:
             logger.error(f"Still no RC-2 after forcing: {llm_response.get('type')}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
-            
     except Exception as e:
         logger.error(f"Error in handle_s3: {e}")
         session = await storage.get_session(user_id) or {}
@@ -272,18 +228,14 @@ async def handle_decision(message: Message, state: FSMContext):
     user_id = message.from_user.id
     if message.text.strip() not in ["1", "2"]:
         return
-    
     try:
         session = await storage.get_session(user_id)
         lang = session.get("language", "en")
         options = session.get("last_response", {}).get("options", [])
         user_answer = map_input_to_option(message.text, options)
-        
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
-        
         if message.text.strip() == "1":
             llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-            
             if llm_response.get("type") == "RATE_LIMIT_ERROR":
                 await message.answer(llm_response["message"])
                 await storage.clear_session(user_id)
@@ -293,30 +245,23 @@ async def handle_decision(message: Message, state: FSMContext):
                 from handlers.emergency import handle_emergency
                 await handle_emergency(message, state, llm_response)
                 return
-            
             if llm_response.get("type") == "RC-1" and "question" in llm_response and "options" in llm_response:
                 await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
                 await storage.update_session(user_id, {"last_response": llm_response})
-                question_text = format_question_with_options(
-                    llm_response["question"], llm_response["options"], question_num=4, total=6, language=lang
-                )
+                question_text = format_question_with_options(llm_response["question"], llm_response["options"], question_num=4, total=6, language=lang)
                 await message.answer(question_text)
                 await state.set_state(DiagnosticStates.s4)
             else:
                 logger.error(f"Expected RC-1 for S4, got: {llm_response.get('type')}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
-                
         else:
             from translations import get_text
             from handlers.pre_fsm import PreFSMStates
-            
             await storage.clear_session(user_id)
             await state.clear()
-            
             instructions = get_text(lang, "instructions")
             await message.answer(instructions)
             await state.set_state(PreFSMStates.awaiting_s0)
-                
     except Exception as e:
         logger.error(f"Error in handle_decision: {e}")
         session = await storage.get_session(user_id) or {}
@@ -328,27 +273,18 @@ async def handle_decision(message: Message, state: FSMContext):
 async def handle_deep_analysis(message: Message, state: FSMContext):
     user_id = message.from_user.id
     current_state = await state.get_state()
-    state_map = {
-        "DiagnosticStates:s4": (4, DiagnosticStates.s5),
-        "DiagnosticStates:s5": (5, DiagnosticStates.s6),
-        "DiagnosticStates:s6": (6, None)
-    }
+    state_map = {"DiagnosticStates:s4": (4, DiagnosticStates.s5), "DiagnosticStates:s5": (5, DiagnosticStates.s6), "DiagnosticStates:s6": (6, None)}
     question_num, next_state = state_map.get(current_state, (4, None))
-    
     try:
         session = await storage.get_session(user_id)
         lang = session.get("language", "en")
         options = session.get("last_response", {}).get("options", [])
         user_answer = map_input_to_option(message.text, options)
-        
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
-        
         if next_state is None:
             verdict_request = "Now provide the final RC-2 Verdict 2 with complete analysis. This is after S6, the last question."
             await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
-        
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-        
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
             await message.answer(llm_response["message"])
             await storage.clear_session(user_id)
@@ -358,20 +294,17 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response)
             return
-        
         if llm_response.get("type") == "RC-2":
             if "content" not in llm_response:
                 logger.error(f"RC-2 missing content: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
             await send_verdict(message, state, llm_response, user_id, lang)
-            
         elif llm_response.get("type") == "RC-1":
             if "question" not in llm_response or "options" not in llm_response:
                 logger.error(f"Invalid RC-1 in deep analysis: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
-            
             if next_state is None:
                 logger.error("Got RC-1 after S6 - forcing final verdict")
                 await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
@@ -384,19 +317,14 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
                     logger.error(f"Still no RC-2: {final_response}")
                     await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
-            
             await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
             await storage.update_session(user_id, {"last_response": llm_response})
-            question_text = format_question_with_options(
-                llm_response["question"], llm_response["options"],
-                question_num=question_num + 1, total=6, language=lang
-            )
+            question_text = format_question_with_options(llm_response["question"], llm_response["options"], question_num=question_num + 1, total=6, language=lang)
             await message.answer(question_text)
             await state.set_state(next_state)
         else:
             logger.error(f"Unexpected type: {llm_response.get('type')}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
-            
     except Exception as e:
         logger.error(f"Error in handle_deep_analysis: {e}")
         session = await storage.get_session(user_id) or {}
@@ -404,33 +332,28 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
 
 async def send_verdict(message: Message, state: FSMContext, verdict: dict, user_id: int, language: str):
     log_verdict(user_id, verdict.get("pattern_label", "Unknown"), language)
-    
     text = verdict.get("content", "Анализ недоступен")
     MAX_LENGTH = 4000
-    
     if len(text) <= MAX_LENGTH:
         await message.answer(text, parse_mode="Markdown")
     else:
         parts = []
         current_part = ""
-        
-        for line in text.split('\n'):
+        text_lines = text.split('\n')
+        for line in text_lines:
             if len(current_part) + len(line) + 1 > MAX_LENGTH:
                 if current_part:
                     parts.append(current_part)
                 current_part = line + '\n'
             else:
                 current_part += line + '\n'
-        
         if current_part:
             parts.append(current_part)
-        
         for i, part in enumerate(parts):
             if i == 0:
                 await message.answer(part, parse_mode="Markdown")
             else:
                 await message.answer(f"_(продолжение {i+1})_\n\n{part}", parse_mode="Markdown")
-    
     await storage.clear_session(user_id)
     await state.clear()
     end_msg = SESSION_ENDED_MESSAGES.get(language, SESSION_ENDED_MESSAGES["en"])
