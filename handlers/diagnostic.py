@@ -118,7 +118,6 @@ async def start_diagnostic(message: Message, state: FSMContext, s0_text: str):
         await message.answer(ERROR_MESSAGES.get(session.get("language", "en"), ERROR_MESSAGES["en"]))
 
 async def handle_question(message: Message, state: FSMContext, next_state, question_num: int):
-    """Generic handler for S1-S3"""
     user_id = message.from_user.id
     try:
         session = await storage.get_session(user_id)
@@ -143,13 +142,11 @@ async def handle_question(message: Message, state: FSMContext, next_state, quest
             await handle_emergency(message, state, llm_response)
             return
         
-        # Check if got RC-2 prematurely (before S3)
         if llm_response.get("type") == "RC-2" and question_num < 3:
             logger.warning(f"Got premature RC-2 at S{question_num}, requesting next question")
             request = f"Continue with question S{question_num+1}. Do NOT provide final verdict yet. Ask the next diagnostic question with 4 options."
             await storage.add_to_history(user_id, {"role": "user", "content": request})
             llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-            # If still RC-2, give up and use it
             if llm_response.get("type") == "RC-2":
                 logger.error(f"LLM insists on RC-2 at S{question_num}, accepting it")
                 if "content" in llm_response:
@@ -193,7 +190,6 @@ async def handle_s3(message: Message, state: FSMContext):
         user_answer = map_input_to_option(message.text, options)
         
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
-        
         verdict_request = "Now provide RC-2 Verdict 1 (80-100 words): МЕХАНИЗМ, ТРИГГЕР, СКРЫТАЯ ВЫГОДА, ТВОЙ ТИП (2-3 words), ВОПРОС about deep analysis."
         await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
         
@@ -218,27 +214,20 @@ async def handle_s3(message: Message, state: FSMContext):
             else:
                 parts = []
                 current_part = ""
-                lines = text.split("
-")
-                for line in lines:
+                for line in text.split('\n'):
                     if len(current_part) + len(line) + 1 > MAX_LENGTH:
                         if current_part:
                             parts.append(current_part)
-                        current_part = line + "
-"
+                        current_part = line + '\n'
                     else:
-                        current_part += line + "
-"
+                        current_part += line + '\n'
                 if current_part:
                     parts.append(current_part)
                 for i, part in enumerate(parts):
                     if i == 0:
                         await message.answer(part, parse_mode="Markdown")
                     else:
-                        continuation = f"_(продолжение {i+1})_
-
-{part}"
-                        await message.answer(continuation, parse_mode="Markdown")
+                        await message.answer(f"_(продолжение {i+1})_\n\n{part}", parse_mode="Markdown")
             
             decision_request = "Now ask decision point: Continue to deep analysis (3 more questions) or describe another situation?"
             await storage.add_to_history(user_id, {"role": "user", "content": decision_request})
@@ -280,7 +269,6 @@ async def handle_decision(message: Message, state: FSMContext):
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
         
         if message.text.strip() == "1":
-            # User wants deep analysis (S4-S6)
             llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
             
             if llm_response.get("type") == "RATE_LIMIT_ERROR":
@@ -305,12 +293,16 @@ async def handle_decision(message: Message, state: FSMContext):
                 logger.error(f"Expected RC-1 for S4, got: {llm_response.get('type')}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 
-        else:  # message.text.strip() == "2"
-            # User wants to stop at Verdict 1
+        else:
+            from translations import get_text
+            from handlers.pre_fsm import PreFSMStates
+            
             await storage.clear_session(user_id)
             await state.clear()
-            end_msg = SESSION_ENDED_MESSAGES.get(lang, SESSION_ENDED_MESSAGES["en"])
-            await message.answer(end_msg)
+            
+            instructions = get_text(lang, "instructions")
+            await message.answer(instructions)
+            await state.set_state(PreFSMStates.awaiting_s0)
                 
     except Exception as e:
         logger.error(f"Error in handle_decision: {e}")
@@ -338,9 +330,8 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
         
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
         
-        # If this is S6, explicitly request final verdict
         if next_state is None:
-            verdict_request = "Now provide the final RC-2 verdict with complete analysis. This is after S6, the last question."
+            verdict_request = "Now provide the final RC-2 Verdict 2 with complete analysis. This is after S6, the last question."
             await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
         
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
@@ -410,7 +401,7 @@ async def send_verdict(message: Message, state: FSMContext, verdict: dict, user_
         parts = []
         current_part = ""
         
-        for line in text.split('\n')\n'):
+        for line in text.split('\n'):
             if len(current_part) + len(line) + 1 > MAX_LENGTH:
                 if current_part:
                     parts.append(current_part)
