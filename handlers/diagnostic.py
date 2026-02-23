@@ -193,8 +193,10 @@ async def handle_s3(message: Message, state: FSMContext):
         user_answer = map_input_to_option(message.text, options)
         
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
-        decision_request = "Now provide ONLY the decision point with exactly 2 options: deep analysis or show result."
-        await storage.add_to_history(user_id, {"role": "user", "content": decision_request})
+        
+        # Request Verdict 1 immediately after S3
+        verdict_request = "Now provide RC-2 Verdict 1 (80-100 words): МЕХАНИЗМ, ТРИГГЕР, СКРЫТАЯ ВЫГОДА, ТВОЙ ТИП (2-3 words), ВОПРОС about deep analysis."
+        await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
         
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
         
@@ -208,36 +210,59 @@ async def handle_s3(message: Message, state: FSMContext):
             await handle_emergency(message, state, llm_response)
             return
         
-        # Force decision point format
-        if llm_response.get("type") not in ["RC-1", "decision_point"] or len(llm_response.get("options", [])) != 2:
-            logger.warning(f"LLM skipped decision point, forcing manually")
-            decision_options_map = {
-                "ru": ["Глубокий анализ", "Показать результат"],
-                "en": ["Deep analysis", "Show result"],
-                "es": ["Análisis profundo", "Mostrar resultado"],
-                "fr": ["Analyse approfondie", "Afficher le résultat"],
-                "de": ["Tiefenanalyse", "Ergebnis anzeigen"]
-            }
-            decision_question_map = {
-                "ru": "Анализ завершен.",
-                "en": "Analysis complete.",
-                "es": "Análisis completo.",
-                "fr": "Analyse terminée.",
-                "de": "Analyse abgeschlossen."
-            }
-            llm_response = {
-                "type": "RC-1",
-                "question": decision_question_map.get(lang, decision_question_map["en"]),
-                "options": decision_options_map.get(lang, decision_options_map["en"])
-            }
-        
-        await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
-        await storage.update_session(user_id, {"last_response": llm_response})
-        question_text = format_question_with_options(
-            llm_response["question"], llm_response["options"], question_num=0, language=lang
-        )
-        await message.answer(question_text)
-        await state.set_state(DiagnosticStates.decision_point)
+        # Expect RC-2 (Verdict 1)
+        if llm_response.get("type") == "RC-2" and "content" in llm_response:
+            # Send Verdict 1
+            text = llm_response["content"]
+            MAX_LENGTH = 4000
+            
+            if len(text) <= MAX_LENGTH:
+                await message.answer(text, parse_mode="Markdown")
+            else:
+                # Split if too long
+                parts = []
+                current_part = ""
+                for line in text.split('
+'):
+                    if len(current_part) + len(line) + 1 > MAX_LENGTH:
+                        if current_part:
+                            parts.append(current_part)
+                        current_part = line + '
+'
+                    else:
+                        current_part += line + '
+'
+                if current_part:
+                    parts.append(current_part)
+                for i, part in enumerate(parts):
+                    if i == 0:
+                        await message.answer(part, parse_mode="Markdown")
+                    else:
+                        await message.answer(f"_(продолжение {i+1})_
+
+{part}", parse_mode="Markdown")
+            
+            # Now ask decision point
+            decision_request = "Now ask decision point: Continue to deep analysis (3 more questions) or stop here?"
+            await storage.add_to_history(user_id, {"role": "user", "content": decision_request})
+            
+            decision_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+            
+            if decision_response.get("type") == "RC-1" and "question" in decision_response and "options" in decision_response:
+                await storage.add_to_history(user_id, {"role": "assistant", "content": decision_response["question"]})
+                await storage.update_session(user_id, {"last_response": decision_response})
+                question_text = format_question_with_options(
+                    decision_response["question"], decision_response["options"], question_num=0, language=lang
+                )
+                await message.answer(question_text)
+                await state.set_state(DiagnosticStates.decision_point)
+            else:
+                logger.error(f"Expected RC-1 decision point, got: {decision_response.get('type')}")
+                await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+        else:
+            logger.error(f"Expected RC-2 Verdict 1 after S3, got: {llm_response.get('type')}")
+            await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+            
     except Exception as e:
         logger.error(f"Error in handle_s3: {e}")
         session = await storage.get_session(user_id) or {}
@@ -257,9 +282,8 @@ async def handle_decision(message: Message, state: FSMContext):
         
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
         
-        # User chose "1" = Deep analysis, "2" = Show result
         if message.text.strip() == "1":
-            # Request S4
+            # User wants deep analysis (S4-S6)
             llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
             
             if llm_response.get("type") == "RATE_LIMIT_ERROR":
@@ -273,7 +297,6 @@ async def handle_decision(message: Message, state: FSMContext):
                 return
             
             if llm_response.get("type") == "RC-1" and "question" in llm_response and "options" in llm_response:
-                # Got S4 question
                 await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
                 await storage.update_session(user_id, {"last_response": llm_response})
                 question_text = format_question_with_options(
@@ -281,36 +304,16 @@ async def handle_decision(message: Message, state: FSMContext):
                 )
                 await message.answer(question_text)
                 await state.set_state(DiagnosticStates.s4)
-            elif llm_response.get("type") == "RC-2":
-                # LLM gave verdict instead of S4 - accept it
-                logger.warning("Got RC-2 instead of S4 after choosing deep analysis")
-                if "content" in llm_response:
-                    await send_verdict(message, state, llm_response, user_id, lang)
-                else:
-                    await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
             else:
-                logger.error(f"Unexpected response after choosing deep analysis: {llm_response.get('type')}")
+                logger.error(f"Expected RC-1 for S4, got: {llm_response.get('type')}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 
         else:  # message.text.strip() == "2"
-            # Request final verdict
-            llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-            
-            if llm_response.get("type") == "RATE_LIMIT_ERROR":
-                await message.answer(llm_response["message"])
-                await storage.clear_session(user_id)
-                await state.clear()
-                return
-            if llm_response.get("type") == "RC-3":
-                from handlers.emergency import handle_emergency
-                await handle_emergency(message, state, llm_response)
-                return
-            
-            if llm_response.get("type") == "RC-2" and "content" in llm_response:
-                await send_verdict(message, state, llm_response, user_id, lang)
-            else:
-                logger.error(f"Expected RC-2 after choosing show result, got: {llm_response.get('type')}")
-                await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+            # User wants to stop at Verdict 1
+            await storage.clear_session(user_id)
+            await state.clear()
+            end_msg = SESSION_ENDED_MESSAGES.get(lang, SESSION_ENDED_MESSAGES["en"])
+            await message.answer(end_msg)
                 
     except Exception as e:
         logger.error(f"Error in handle_decision: {e}")
