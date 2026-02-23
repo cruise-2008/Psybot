@@ -33,7 +33,13 @@ QUESTION DESIGN (S1-S6):
 DO NOT provide RC-2 after S1 or S2. Complete S1-S3 first.
 
 DECISION POINT (after S3 only):
-{"type":"RC-1","question":"Analysis complete.","options":["Deep analysis","Show result"]}
+CRITICAL: Translate both question and options to user's language!
+Examples:
+- Russian: {"type":"RC-1","question":"Анализ завершен.","options":["Глубокий анализ","Показать результат"]}
+- English: {"type":"RC-1","question":"Analysis complete.","options":["Deep analysis","Show result"]}
+- Spanish: {"type":"RC-1","question":"Análisis completo.","options":["Análisis profundo","Mostrar resultado"]}
+- French: {"type":"RC-1","question":"Analyse terminée.","options":["Analyse approfondie","Afficher le résultat"]}
+- German: {"type":"RC-1","question":"Analyse abgeschlossen.","options":["Tiefenanalyse","Ergebnis anzeigen"]}
 
 ---
 
