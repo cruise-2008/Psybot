@@ -164,7 +164,7 @@ async def handle_s3(message: Message, state: FSMContext):
         user_answer = map_input_to_option(message.text, options)
         
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
-        verdict_request = "CRITICAL: This is after S3. You MUST provide RC-2 Verdict 1 now (80-100 words with МЕХАНИЗМ, ПЕРЕФОРМУЛИРОВКА, Analysis complete). Do NOT ask another question."
+        verdict_request = "CRITICAL: This is after S3. You MUST provide RC-2 Verdict 1 now (80-100 words). Do NOT ask another question."
         await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
         
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
@@ -181,7 +181,7 @@ async def handle_s3(message: Message, state: FSMContext):
         
         if llm_response.get("type") == "RC-1":
             logger.error("Got RC-1 instead of RC-2 after S3, forcing verdict")
-            force_request = "You must provide RC-2 Verdict 1 immediately. No more questions. Provide the verdict based on S1-S3 answers."
+            force_request = "You must provide RC-2 Verdict 1 immediately. No more questions."
             await storage.add_to_history(user_id, {"role": "user", "content": force_request})
             llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
         
@@ -194,16 +194,15 @@ async def handle_s3(message: Message, state: FSMContext):
             else:
                 parts = []
                 current_part = ""
-                for line in text.split("
-"):
-                    line_with_newline = line + "
-"
-                    if len(current_part) + len(line_with_newline) > MAX_LENGTH:
+                lines = text.split('\n')
+                for line in lines:
+                    test_part = current_part + line + '\n'
+                    if len(test_part) > MAX_LENGTH:
                         if current_part:
                             parts.append(current_part)
-                        current_part = line_with_newline
+                        current_part = line + '\n'
                     else:
-                        current_part += line_with_newline
+                        current_part = test_part
                 if current_part:
                     parts.append(current_part)
                 
@@ -211,19 +210,16 @@ async def handle_s3(message: Message, state: FSMContext):
                     if i == 0:
                         await message.answer(part, parse_mode="Markdown")
                     else:
-                        continuation = f"_(продолжение {i+1})_
-
-{part}"
-                        await message.answer(continuation, parse_mode="Markdown")
+                        await message.answer(f"_(продолжение {i+1})_\n\n{part}", parse_mode="Markdown")
             
-            decision_options_map = {
+            decision_options = {
                 "ru": ["Глубокий анализ (ещё 3 вопроса)", "Описать другую ситуацию"],
                 "en": ["Deep analysis (3 more questions)", "Describe another situation"],
                 "es": ["Análisis profundo (3 preguntas más)", "Describir otra situación"],
                 "fr": ["Analyse approfondie (3 questions)", "Décrire une autre situation"],
                 "de": ["Tiefenanalyse (3 Fragen)", "Andere Situation beschreiben"]
             }
-            decision_question_map = {
+            decision_questions = {
                 "ru": "Что дальше?",
                 "en": "What next?",
                 "es": "¿Qué sigue?",
@@ -233,8 +229,8 @@ async def handle_s3(message: Message, state: FSMContext):
             
             decision_response = {
                 "type": "RC-1",
-                "question": decision_question_map.get(lang, decision_question_map["en"]),
-                "options": decision_options_map.get(lang, decision_options_map["en"])
+                "question": decision_questions.get(lang, "What next?"),
+                "options": decision_options.get(lang, decision_options["en"])
             }
             
             await storage.add_to_history(user_id, {"role": "assistant", "content": decision_response["question"]})
@@ -245,7 +241,7 @@ async def handle_s3(message: Message, state: FSMContext):
             await message.answer(question_text)
             await state.set_state(DiagnosticStates.decision_point)
         else:
-            logger.error(f"Still no RC-2 after forcing: {llm_response.get('type')}")
+            logger.error(f"Still no RC-2: {llm_response.get('type')}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
             
     except Exception as e:
@@ -312,7 +308,7 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
         user_answer = map_input_to_option(message.text, options)
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
         if next_state is None:
-            verdict_request = "Now provide the final RC-2 Verdict 2 with complete analysis. This is after S6, the last question."
+            verdict_request = "Now provide the final RC-2 Verdict 2 with complete analysis. This is after S6."
             await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
@@ -332,11 +328,11 @@ async def handle_deep_analysis(message: Message, state: FSMContext):
             await send_verdict(message, state, llm_response, user_id, lang)
         elif llm_response.get("type") == "RC-1":
             if "question" not in llm_response or "options" not in llm_response:
-                logger.error(f"Invalid RC-1 in deep analysis: {llm_response}")
+                logger.error(f"Invalid RC-1: {llm_response}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
                 return
             if next_state is None:
-                logger.error("Got RC-1 after S6 - forcing final verdict")
+                logger.error("Got RC-1 after S6, forcing verdict")
                 await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
                 await storage.add_to_history(user_id, {"role": "user", "content": llm_response["options"][0]})
                 await storage.add_to_history(user_id, {"role": "user", "content": "Now provide RC-2 final verdict."})
@@ -369,14 +365,15 @@ async def send_verdict(message: Message, state: FSMContext, verdict: dict, user_
     else:
         parts = []
         current_part = ""
-        text_lines = text.split('\n')
-        for line in text_lines:
-            if len(current_part) + len(line) + 1 > MAX_LENGTH:
+        lines = text.split('\n')
+        for line in lines:
+            test_part = current_part + line + '\n'
+            if len(test_part) > MAX_LENGTH:
                 if current_part:
                     parts.append(current_part)
                 current_part = line + '\n'
             else:
-                current_part += line + '\n'
+                current_part = test_part
         if current_part:
             parts.append(current_part)
         for i, part in enumerate(parts):
