@@ -188,22 +188,56 @@ async def handle_s3(message: Message, state: FSMContext):
             else:
                 parts = []
                 current_part = ""
-                text_lines = text.split('\n')
+                text_lines = text.split('
+')
                 for line in text_lines:
                     if len(current_part) + len(line) + 1 > MAX_LENGTH:
                         if current_part:
                             parts.append(current_part)
-                        current_part = line + '\n'
+                        current_part = line + '
+'
                     else:
-                        current_part += line + '\n'
+                        current_part += line + '
+'
                 if current_part:
                     parts.append(current_part)
                 for i, part in enumerate(parts):
                     if i == 0:
                         await message.answer(part, parse_mode="Markdown")
                     else:
-                        await message.answer(f"_(продолжение {i+1})_\n\n{part}", parse_mode="Markdown")
-            decision_request = "Now ask decision point with 2 options: deep analysis OR describe another situation. Use exact format from prompt."
+                        await message.answer(f"_(продолжение {i+1})_
+
+{part}", parse_mode="Markdown")
+            
+            # Clear history after verdict 1 and manually create decision point
+            decision_options_map = {
+                "ru": ["Глубокий анализ (ещё 3 вопроса)", "Описать другую ситуацию"],
+                "en": ["Deep analysis (3 more questions)", "Describe another situation"],
+                "es": ["Análisis profundo (3 preguntas más)", "Describir otra situación"],
+                "fr": ["Analyse approfondie (3 questions)", "Décrire une autre situation"],
+                "de": ["Tiefenanalyse (3 Fragen)", "Andere Situation beschreiben"]
+            }
+            decision_question_map = {
+                "ru": "Что дальше?",
+                "en": "What next?",
+                "es": "¿Qué sigue?",
+                "fr": "Et ensuite?",
+                "de": "Was weiter?"
+            }
+            
+            decision_response = {
+                "type": "RC-1",
+                "question": decision_question_map.get(lang, decision_question_map["en"]),
+                "options": decision_options_map.get(lang, decision_options_map["en"])
+            }
+            
+            await storage.add_to_history(user_id, {"role": "assistant", "content": decision_response["question"]})
+            await storage.update_session(user_id, {"last_response": decision_response})
+            question_text = format_question_with_options(
+                decision_response["question"], decision_response["options"], question_num=0, language=lang
+            )
+            await message.answer(question_text)
+            await state.set_state(DiagnosticStates.decision_point)
             await storage.add_to_history(user_id, {"role": "user", "content": decision_request})
             decision_response = await llm_client.get_response(await storage.get_history(user_id), lang)
             if decision_response.get("type") == "RC-1" and len(decision_response.get("options", [])) == 2:
