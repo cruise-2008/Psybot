@@ -261,6 +261,9 @@ async def handle_decision(message: Message, state: FSMContext):
         user_answer = map_input_to_option(message.text, options)
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
         if message.text.strip() == "1":
+            s4_request = "User chose deep analysis. Now ask S4 question (RC-1 with 4 options about life rules/beliefs). Do NOT provide RC-2 yet."
+            await storage.add_to_history(user_id, {"role": "user", "content": s4_request})
+            
             llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
             if llm_response.get("type") == "RATE_LIMIT_ERROR":
                 await message.answer(llm_response["message"])
@@ -271,6 +274,14 @@ async def handle_decision(message: Message, state: FSMContext):
                 from handlers.emergency import handle_emergency
                 await handle_emergency(message, state, llm_response)
                 return
+            
+            # If got RC-2 instead of RC-1, force S4 question
+            if llm_response.get("type") == "RC-2":
+                logger.error("Got RC-2 instead of S4, forcing question")
+                force_request = "You MUST ask S4 question now (RC-1 format). User chose deep analysis. Do NOT skip to verdict."
+                await storage.add_to_history(user_id, {"role": "user", "content": force_request})
+                llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+            
             if llm_response.get("type") == "RC-1" and "question" in llm_response and "options" in llm_response:
                 await storage.add_to_history(user_id, {"role": "assistant", "content": llm_response["question"]})
                 await storage.update_session(user_id, {"last_response": llm_response})
@@ -278,7 +289,7 @@ async def handle_decision(message: Message, state: FSMContext):
                 await message.answer(question_text)
                 await state.set_state(DiagnosticStates.s4)
             else:
-                logger.error(f"Expected RC-1 for S4, got: {llm_response.get('type')}")
+                logger.error(f"Still not RC-1 for S4: {llm_response.get('type')}")
                 await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
         else:
             from translations import get_text

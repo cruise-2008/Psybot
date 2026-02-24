@@ -82,6 +82,9 @@ English: {"type":"RC-1","question":"What next?","options":["Deep analysis (3 mor
 
 PHASE 2: S4-S6 → RC-2 Verdict 2
 
+CRITICAL: If user chose option 1 (Deep analysis), you MUST ask S4 question (RC-1 with 4 options).
+DO NOT provide RC-2 immediately after decision point. S4-S6 are MANDATORY if user chose deep analysis.
+
 S4 (ПРАВИЛО/УБЕЖДЕНИЕ):
 Скрытая установка, по которой живёшь в [их ситуация]?
 4 варианта от первого лица о внутренних правилах
