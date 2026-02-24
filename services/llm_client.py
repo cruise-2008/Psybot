@@ -108,6 +108,24 @@ Keep text concise"""
             if last_brace > 0:
                 content = content[:last_brace+1]
 
+        # Handle case where LLM returns two JSONs
+        if content.count('}{') > 0:
+            logger.warning("LLM returned multiple JSONs, taking first one")
+            first_json_end = content.find('}{') + 1
+            content = content[:first_json_end]
+        
+        # Handle case where LLM returns two JSONs
+        if content.count('}{') > 0:
+            logger.warning("LLM returned multiple JSONs, taking first one")
+            first_json_end = content.find('}{') + 1
+            content = content[:first_json_end]
+        
+        # Handle case where LLM returns two JSONs
+        if content.count('}{') > 0:
+            logger.warning("LLM returned multiple JSONs, taking first one")
+            first_json_end = content.find('}{') + 1
+            content = content[:first_json_end]
+        
         try:
             parsed = json.loads(content)
         except json.JSONDecodeError as e:
