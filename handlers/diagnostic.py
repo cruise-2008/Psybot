@@ -162,10 +162,13 @@ async def handle_s3(message: Message, state: FSMContext):
         lang = session.get("language", "en")
         options = session.get("last_response", {}).get("options", [])
         user_answer = map_input_to_option(message.text, options)
+        
         await storage.add_to_history(user_id, {"role": "user", "content": user_answer})
-        verdict_request = "CRITICAL: This is after S3. You MUST provide RC-2 Verdict 1 now (80-100 words with МЕХАНИЗМ, ТРИГГЕР, СКРЫТАЯ ВЫГОДА, ТВОЙ ТИП). Do NOT ask another question."
+        verdict_request = "CRITICAL: This is after S3. You MUST provide RC-2 Verdict 1 now (80-100 words with МЕХАНИЗМ, ПЕРЕФОРМУЛИРОВКА, Analysis complete). Do NOT ask another question."
         await storage.add_to_history(user_id, {"role": "user", "content": verdict_request})
+        
         llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+        
         if llm_response.get("type") == "RATE_LIMIT_ERROR":
             await message.answer(llm_response["message"])
             await storage.clear_session(user_id)
@@ -175,41 +178,44 @@ async def handle_s3(message: Message, state: FSMContext):
             from handlers.emergency import handle_emergency
             await handle_emergency(message, state, llm_response)
             return
+        
         if llm_response.get("type") == "RC-1":
             logger.error("Got RC-1 instead of RC-2 after S3, forcing verdict")
             force_request = "You must provide RC-2 Verdict 1 immediately. No more questions. Provide the verdict based on S1-S3 answers."
             await storage.add_to_history(user_id, {"role": "user", "content": force_request})
             llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+        
         if llm_response.get("type") == "RC-2" and "content" in llm_response:
             text = llm_response["content"]
             MAX_LENGTH = 4000
+            
             if len(text) <= MAX_LENGTH:
                 await message.answer(text, parse_mode="Markdown")
             else:
                 parts = []
                 current_part = ""
-                text_lines = text.split('
-')
-                for line in text_lines:
-                    if len(current_part) + len(line) + 1 > MAX_LENGTH:
+                for line in text.split("
+"):
+                    line_with_newline = line + "
+"
+                    if len(current_part) + len(line_with_newline) > MAX_LENGTH:
                         if current_part:
                             parts.append(current_part)
-                        current_part = line + '
-'
+                        current_part = line_with_newline
                     else:
-                        current_part += line + '
-'
+                        current_part += line_with_newline
                 if current_part:
                     parts.append(current_part)
+                
                 for i, part in enumerate(parts):
                     if i == 0:
                         await message.answer(part, parse_mode="Markdown")
                     else:
-                        await message.answer(f"_(продолжение {i+1})_
+                        continuation = f"_(продолжение {i+1})_
 
-{part}", parse_mode="Markdown")
+{part}"
+                        await message.answer(continuation, parse_mode="Markdown")
             
-            # Clear history after verdict 1 and manually create decision point
             decision_options_map = {
                 "ru": ["Глубокий анализ (ещё 3 вопроса)", "Описать другую ситуацию"],
                 "en": ["Deep analysis (3 more questions)", "Describe another situation"],
@@ -238,20 +244,10 @@ async def handle_s3(message: Message, state: FSMContext):
             )
             await message.answer(question_text)
             await state.set_state(DiagnosticStates.decision_point)
-            await storage.add_to_history(user_id, {"role": "user", "content": decision_request})
-            decision_response = await llm_client.get_response(await storage.get_history(user_id), lang)
-            if decision_response.get("type") == "RC-1" and len(decision_response.get("options", [])) == 2:
-                await storage.add_to_history(user_id, {"role": "assistant", "content": decision_response["question"]})
-                await storage.update_session(user_id, {"last_response": decision_response})
-                question_text = format_question_with_options(decision_response["question"], decision_response["options"], question_num=0, language=lang)
-                await message.answer(question_text)
-                await state.set_state(DiagnosticStates.decision_point)
-            else:
-                logger.error(f"Expected RC-1 decision point with 2 options, got: {decision_response}")
-                await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
         else:
             logger.error(f"Still no RC-2 after forcing: {llm_response.get('type')}")
             await message.answer(ERROR_MESSAGES.get(lang, ERROR_MESSAGES["en"]))
+            
     except Exception as e:
         logger.error(f"Error in handle_s3: {e}")
         session = await storage.get_session(user_id) or {}
