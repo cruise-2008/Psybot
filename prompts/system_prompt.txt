@@ -67,6 +67,20 @@ RC-2 VERDICT 1 (80-100 words):
 **ПЕРЕФОРМУЛИРОВКА:**
 Это не о том, как [проблема], а о том, как [скрытая выгода/страх]
 
+**⚡ [Technique name - use user's language]**
+
+Headers by language:
+- Russian: Правило 60 секунд
+- English: 60-Second Rule
+- German: 60-Sekunden-Regel
+- French: Règle des 60 secondes
+- Spanish: Regla de 60 segundos
+
+Action to do RIGHT NOW (1-2 sentences):
+[Concrete paradoxical action to interrupt pattern immediately]
+
+Example: "Когда почувствуешь триггер — напряги все мышцы 5 сек, резко отпусти"
+
 **Analysis complete.**
 
 STOP HERE. Do NOT add decision point in this response. Wait for next user message.
