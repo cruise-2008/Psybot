@@ -75,9 +75,7 @@ class LLMClient:
 User's language: {user_language}. Respond in this language.
 
 CRITICAL JSON RULE:
-Inside field values, ALWAYS use single quotes ' for any quoted text, NEVER double quotes "
-Example CORRECT: "When you say 'I must accept'"
-Example WRONG: "When you say \\"I must accept\\""
+Use proper JSON format with double quotes for all keys and string values.
 NO markdown fences
 Keep text concise"""
 
@@ -114,21 +112,30 @@ Keep text concise"""
             first_json_end = content.find('}{') + 1
             content = content[:first_json_end]
         
-        # Handle case where LLM returns two JSONs
-        if content.count('}{') > 0:
-            logger.warning("LLM returned multiple JSONs, taking first one")
-            first_json_end = content.find('}{') + 1
-            content = content[:first_json_end]
-        
-        # Handle case where LLM returns two JSONs
-        if content.count('}{') > 0:
-            logger.warning("LLM returned multiple JSONs, taking first one")
-            first_json_end = content.find('}{') + 1
-            content = content[:first_json_end]
-        
         # Fix single quotes in JSON keys (LLM sometimes uses ' instead of ")
-        content = re.sub(r"'(type|question|options|content|emergency_code|detected_trigger|user_language)':", r'"":', content)
+        content = re.sub(r"'(type|question|options|content|emergency_code|detected_trigger|user_language)':", r'"\1":', content)
         
+        # Fix empty keys (LLM sometimes removes key names)
+        if '"":\'' in content or '"":[' in content:
+            logger.warning("LLM returned empty keys, reconstructing")
+            parts = content.split('""')
+            if len(parts) >= 4:
+                content = content.replace('""', '"type"', 1)
+                content = content.replace('""', '"question"', 1)
+                content = content.replace('""', '"options"', 1)
+        
+        # Fix escaped quotes inside single-quoted strings (French, German apostrophes)
+        # Pattern: 'd\'excuses' or 'qu\'il' should become "d'excuses" or "qu'il"
+        if "\\'" in content:
+            logger.warning("Found escaped apostrophes, fixing")
+            # Replace escaped apostrophes with placeholder
+            content = content.replace("\\'", "___APOSTROPHE___")
+            # Replace single quote delimiters with double quotes
+            content = re.sub(r":\'([^\']*?)\'", r':"\1"', content)
+            content = re.sub(r"\[\'([^\']*?)\'", r'["\1"', content)
+            # Restore apostrophes
+            content = content.replace("___APOSTROPHE___", "'")
+
         try:
             parsed = json.loads(content)
         except json.JSONDecodeError as e:
