@@ -1,6 +1,7 @@
 import json
 import re
 import logging
+import asyncio
 from config import LLM_PROVIDER, GROQ_API_KEY, GOOGLE_API_KEY, GROQ_MODEL, TEMPERATURE, MAX_TOKENS
 
 logger = logging.getLogger(__name__)
@@ -35,21 +36,32 @@ class LLMClient:
             self.system_prompt = f.read()
 
     async def get_response(self, conversation_history: list, user_language: str) -> dict:
-        try:
-            if self.provider == "groq":
-                return await self._get_groq_response(conversation_history, user_language)
-            elif self.provider == "google":
-                return await self._get_google_response(conversation_history, user_language)
-        except Exception as e:
-            error_msg = str(e)
-            if "rate_limit" in error_msg.lower() or "429" in error_msg or "quota" in error_msg.lower():
-                logger.error(f"LLM API rate limit exceeded: {e}")
-                return {
-                    "type": "RATE_LIMIT_ERROR",
-                    "message": RATE_LIMIT_MESSAGES.get(user_language, RATE_LIMIT_MESSAGES["en"])
-                }
-            logger.error(f"LLM API error: {e}")
-            raise
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                if self.provider == "groq":
+                    return await self._get_groq_response(conversation_history, user_language)
+                elif self.provider == "google":
+                    return await self._get_google_response(conversation_history, user_language)
+            except Exception as e:
+                error_msg = str(e)
+                
+                # Rate limit - no retry
+                if "rate_limit" in error_msg.lower() or "429" in error_msg or "quota" in error_msg.lower():
+                    logger.error(f"LLM API rate limit exceeded: {e}")
+                    return {
+                        "type": "RATE_LIMIT_ERROR",
+                        "message": RATE_LIMIT_MESSAGES.get(user_language, RATE_LIMIT_MESSAGES["en"])
+                    }
+                
+                # Timeout or 500 - retry
+                if ("timeout" in error_msg.lower() or "504" in error_msg or "500" in error_msg) and attempt < max_retries - 1:
+                    logger.warning(f"LLM timeout/error on attempt {attempt + 1}, retrying in 3 seconds...")
+                    await asyncio.sleep(3)
+                    continue
+                
+                logger.error(f"LLM API error: {e}")
+                raise
 
     async def _get_groq_response(self, conversation_history: list, user_language: str) -> dict:
         messages = [
