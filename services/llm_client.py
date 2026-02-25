@@ -126,6 +126,9 @@ Keep text concise"""
             first_json_end = content.find('}{') + 1
             content = content[:first_json_end]
         
+        # Fix single quotes in JSON keys (LLM sometimes uses ' instead of ")
+        content = re.sub(r"'(type|question|options|content|emergency_code|detected_trigger|user_language)':", r'"":', content)
+        
         try:
             parsed = json.loads(content)
         except json.JSONDecodeError as e:
