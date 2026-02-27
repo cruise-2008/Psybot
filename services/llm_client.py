@@ -46,7 +46,6 @@ class LLMClient:
             except Exception as e:
                 error_msg = str(e)
                 
-                # Rate limit - no retry
                 if "rate_limit" in error_msg.lower() or "429" in error_msg or "quota" in error_msg.lower():
                     logger.error(f"LLM API rate limit exceeded: {e}")
                     return {
@@ -54,7 +53,6 @@ class LLMClient:
                         "message": RATE_LIMIT_MESSAGES.get(user_language, RATE_LIMIT_MESSAGES["en"])
                     }
                 
-                # Timeout or 500 - retry
                 if ("timeout" in error_msg.lower() or "504" in error_msg or "500" in error_msg) and attempt < max_retries - 1:
                     logger.warning(f"LLM timeout/error on attempt {attempt + 1}, retrying in 3 seconds...")
                     await asyncio.sleep(3)
@@ -118,16 +116,20 @@ Keep text concise"""
             if last_brace > 0:
                 content = content[:last_brace+1]
 
-        # Handle case where LLM returns two JSONs
+        # Handle multiple JSONs
         if content.count('}{') > 0:
             logger.warning("LLM returned multiple JSONs, taking first one")
             first_json_end = content.find('}{') + 1
             content = content[:first_json_end]
         
-        # Fix single quotes in JSON keys (LLM sometimes uses ' instead of ")
+        # GLOBAL FIX: Convert all single quotes to double quotes while preserving apostrophes
+        # Step 1: Replace escaped apostrophes with placeholder
+        content = content.replace("\\'", "___APOSTROPHE___")
+        
+        # Step 2: Fix keys with single quotes: 'key': → "key":
         content = re.sub(r"'(type|question|options|content|emergency_code|detected_trigger|user_language)':", r'"\1":', content)
         
-        # Fix empty keys (LLM sometimes removes key names)
+        # Step 3: Fix empty keys
         if '"":\'' in content or '"":[' in content:
             logger.warning("LLM returned empty keys, reconstructing")
             parts = content.split('""')
@@ -136,17 +138,18 @@ Keep text concise"""
                 content = content.replace('""', '"question"', 1)
                 content = content.replace('""', '"options"', 1)
         
-        # Fix escaped quotes inside single-quoted strings (French, German apostrophes)
-        # Pattern: 'd\'excuses' or 'qu\'il' should become "d'excuses" or "qu'il"
-        if "\\'" in content:
-            logger.warning("Found escaped apostrophes, fixing")
-            # Replace escaped apostrophes with placeholder
-            content = content.replace("\\'", "___APOSTROPHE___")
-            # Replace single quote delimiters with double quotes
-            content = re.sub(r":\'([^\']*?)\'", r':"\1"', content)
-            content = re.sub(r"\[\'([^\']*?)\'", r'["\1"', content)
-            # Restore apostrophes
-            content = content.replace("___APOSTROPHE___", "'")
+        # Step 4: Fix string values with single quotes: :'value' → :"value"
+        # Match pattern: colon followed by single quote
+        content = re.sub(r":(\s*)'([^']*?)'", r':\1"\2"', content)
+        
+        # Step 5: Fix array values with single quotes: ['value' → ["value"
+        content = re.sub(r"\[(\s*)'([^']*?)'", r'[\1"\2"', content)
+        
+        # Step 6: Fix comma-separated array values: ,'value' → ,"value"
+        content = re.sub(r",(\s*)'([^']*?)'", r',\1"\2"', content)
+        
+        # Step 7: Restore apostrophes inside text
+        content = content.replace("___APOSTROPHE___", "'")
 
         try:
             parsed = json.loads(content)
