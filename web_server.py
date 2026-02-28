@@ -6,7 +6,10 @@ from bot import main as bot_main
 logger = logging.getLogger(__name__)
 
 async def health(request):
-    return web.Response(text="Bot is running")
+    return web.Response(text="Bot is running", status=200)
+
+async def root(request):
+    return web.Response(text="PsyCards Bot is active", status=200)
 
 async def start_bot(app):
     asyncio.create_task(bot_main())
