@@ -11,17 +11,24 @@ async def root(request):
 async def health(request):
     return web.Response(text="Bot is running", status=200)
 
-async def init_app():
+async def start_background_tasks(app):
+    """Запуск бота при старте aiohttp"""
+    from bot import main as bot_main
+    app['bot_task'] = asyncio.create_task(bot_main())
+    logger.info("Bot task started")
+
+async def cleanup_background_tasks(app):
+    """Остановка бота при завершении"""
+    app['bot_task'].cancel()
+    await app['bot_task']
+
+if __name__ == "__main__":
     app = web.Application()
     app.router.add_get("/", root)
     app.router.add_get("/health", health)
     
-    # Запустить бота в фоне
-    from bot import main as bot_main
-    asyncio.create_task(bot_main())
+    # Запуск и остановка бота вместе с aiohttp
+    app.on_startup.append(start_background_tasks)
+    app.on_cleanup.append(cleanup_background_tasks)
     
-    return app
-
-if __name__ == "__main__":
-    app = asyncio.run(init_app())
     web.run_app(app, host="0.0.0.0", port=10000)
