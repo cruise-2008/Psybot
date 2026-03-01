@@ -17,10 +17,9 @@ async def start_bot():
 
 if __name__ == "__main__":
     app = web.Application()
+    # aiohttp автоматически обрабатывает HEAD для GET endpoints
     app.router.add_get("/", root)
-    app.router.add_head("/", root)
     app.router.add_get("/health", health)
-    app.router.add_head("/health", health)
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
