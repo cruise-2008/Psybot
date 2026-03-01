@@ -11,19 +11,17 @@ async def root(request):
 async def health(request):
     return web.Response(text="Bot is running", status=200)
 
-async def start_bot():
-    from bot import main as bot_main
-    await bot_main()
-
-if __name__ == "__main__":
+async def init_app():
     app = web.Application()
-    # aiohttp автоматически обрабатывает HEAD для GET endpoints
     app.router.add_get("/", root)
     app.router.add_get("/health", health)
     
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    # Запустить бота в фоне
+    from bot import main as bot_main
+    asyncio.create_task(bot_main())
     
-    loop.create_task(start_bot())
-    
+    return app
+
+if __name__ == "__main__":
+    app = asyncio.run(init_app())
     web.run_app(app, host="0.0.0.0", port=10000)
