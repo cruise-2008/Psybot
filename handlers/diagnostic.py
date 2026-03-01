@@ -180,10 +180,16 @@ async def handle_s3(message: Message, state: FSMContext):
             return
         
         if llm_response.get("type") == "RC-1":
-            logger.error("Got RC-1 instead of RC-2 after S3, forcing verdict")
-            force_request = "You must provide RC-2 Verdict 1 immediately. No more questions."
-            await storage.add_to_history(user_id, {"role": "user", "content": force_request})
-            llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+            logger.error("Got RC-1 instead of RC-2 after S3, forcing verdict with multiple attempts")
+            # Try up to 3 times to get RC-2
+            for attempt in range(3):
+                force_request = f"CRITICAL ERROR: You provided RC-1 but this is AFTER S3. You MUST provide RC-2 Verdict 1 now. This is attempt {attempt+1}/3. Provide RC-2 with МЕХАНИЗМ, ПЕРЕФОРМУЛИРОВКА, and 60-second technique. NO MORE QUESTIONS."
+                await storage.add_to_history(user_id, {"role": "user", "content": force_request})
+                llm_response = await llm_client.get_response(await storage.get_history(user_id), lang)
+                if llm_response.get("type") == "RC-2":
+                    logger.info(f"Got RC-2 on attempt {attempt+1}")
+                    break
+                logger.warning(f"Still RC-1 on attempt {attempt+1}, retrying...")
         
         if llm_response.get("type") == "RC-2" and "content" in llm_response:
             text = llm_response["content"]

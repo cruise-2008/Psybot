@@ -1,22 +1,30 @@
 from aiohttp import web
 import asyncio
 import logging
-from bot import main as bot_main
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-async def health(request):
-    return web.Response(text="Bot is running", status=200)
 
 async def root(request):
     return web.Response(text="PsyCards Bot is active", status=200)
 
-async def start_bot(app):
-    asyncio.create_task(bot_main())
+async def health(request):
+    return web.Response(text="Bot is running", status=200)
 
-app = web.Application()
-app.router.add_get('/health', health)
-app.on_startup.append(start_bot)
+async def start_bot():
+    from bot import main as bot_main
+    await bot_main()
 
-if __name__ == '__main__':
-    web.run_app(app, port=10000)
+if __name__ == "__main__":
+    app = web.Application()
+    app.router.add_get("/", root)
+    app.router.add_head("/", root)
+    app.router.add_get("/health", health)
+    app.router.add_head("/health", health)
+    
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
+    loop.create_task(start_bot())
+    
+    web.run_app(app, host="0.0.0.0", port=10000)
