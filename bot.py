@@ -10,7 +10,7 @@ async def main():
     setup_logging()
     logger = logging.getLogger(__name__)
     
-    bot = Bot(token=config.TELEGRAM_TOKEN)
+    bot = Bot(token=config.BOT_TOKEN)
     dp = Dispatcher()
     
     # Порядок важен: emergency → pre_fsm → diagnostic
