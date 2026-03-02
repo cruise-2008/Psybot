@@ -11,7 +11,7 @@ class LLMClient:
     def __init__(self):
         self.model = genai.GenerativeModel('gemini-1.5-flash')
 
-    async def get_response(self, prompt: str):
+    async def get_response(self, prompt: str, user_id: int = None):
         try:
             response = await self.model.generate_content_async(prompt)
             text = response.text.strip()
@@ -22,7 +22,7 @@ class LLMClient:
             try:
                 return json.loads(text)
             except json.JSONDecodeError:
-                # Резервный парсинг если кавычки внутри текста сломали JSON
+                # Резервный парсинг для сложных случаев с кавычками
                 type_match = re.search(r'"type"\s*:\s*"(.*?)"', text)
                 content_match = re.search(r'"content"\s*:\s*"(.*)"', text, re.DOTALL)
                 
