@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import google.generativeai as genai
 from config import GEMINI_API_KEY
 
@@ -14,22 +15,20 @@ class LLMClient:
         try:
             response = await self.model.generate_content_async(prompt)
             text = response.text
-            
-            # Очистка текста от возможных артефактов markdown
             if text.startswith("```json"):
                 text = text.replace("```json", "").replace("```", "").strip()
             
-            # Пытаемся распарсить JSON
             try:
                 return json.loads(text)
             except json.JSONDecodeError:
-                # Если упало из-за внутренних кавычек, пробуем жесткую очистку
-                import re
-                # Ищем содержимое между "content":" и "}
-                content_match = re.search(r'"content":"(.*)"}', text, re.DOTALL)
-                if content_match:
-                    return {"type": "RC-2", "content": content_match.group(1).replace('"', "'")}
-                raise
+                # Извлекаем контент между кавычками поля "content"
+                match = re.search(r'"content"\s*:\s*"(.*)"\s*\}', text, re.DOTALL)
+                if match:
+                    clean_content = match.group(1).replace('"', "'")
+                    return {"type": "RC-2", "content": clean_content}
+                return None
         except Exception as e:
             logger.error(f"LLM API error: {e}")
             return None
+
+llm_client = LLMClient()
