@@ -1,34 +1,21 @@
-from aiohttp import web
 import asyncio
-import logging
+import os
+from aiohttp import web
+from bot import main as run_bot
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+async def handle(request):
+    return web.Response(text="OK", status=200)
 
-async def root(request):
-    return web.Response(text="PsyCards Bot is active", status=200)
-
-async def health(request):
-    return web.Response(text="Bot is running", status=200)
-
-async def start_background_tasks(app):
-    """Запуск бота при старте aiohttp"""
-    from bot import main as bot_main
-    app['bot_task'] = asyncio.create_task(bot_main())
-    logger.info("Bot task started")
-
-async def cleanup_background_tasks(app):
-    """Остановка бота при завершении"""
-    app['bot_task'].cancel()
-    await app['bot_task']
+async def main():
+    app = web.Application()
+    app.router.add_get("/", handle)
+    app.router.add_head("/", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 10000))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+    await run_bot()
 
 if __name__ == "__main__":
-    app = web.Application()
-    app.router.add_get("/", root)
-    app.router.add_get("/health", health)
-    
-    # Запуск и остановка бота вместе с aiohttp
-    app.on_startup.append(start_background_tasks)
-    app.on_cleanup.append(cleanup_background_tasks)
-    
-    web.run_app(app, host="0.0.0.0", port=10000)
+    asyncio.run(main())

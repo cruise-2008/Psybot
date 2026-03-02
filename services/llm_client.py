@@ -14,18 +14,24 @@ class LLMClient:
     async def get_response(self, prompt: str):
         try:
             response = await self.model.generate_content_async(prompt)
-            text = response.text
-            if text.startswith("```json"):
-                text = text.replace("```json", "").replace("```", "").strip()
+            text = response.text.strip()
+            
+            # Очистка от markdown оберток
+            text = re.sub(r'```json\s*|```', '', text)
             
             try:
                 return json.loads(text)
             except json.JSONDecodeError:
-                # Извлекаем контент между кавычками поля "content"
-                match = re.search(r'"content"\s*:\s*"(.*)"\s*\}', text, re.DOTALL)
-                if match:
-                    clean_content = match.group(1).replace('"', "'")
-                    return {"type": "RC-2", "content": clean_content}
+                # Резервный парсинг если кавычки внутри текста сломали JSON
+                type_match = re.search(r'"type"\s*:\s*"(.*?)"', text)
+                content_match = re.search(r'"content"\s*:\s*"(.*)"', text, re.DOTALL)
+                
+                if type_match and content_match:
+                    return {
+                        "type": type_match.group(1),
+                        "content": content_match.group(1).replace('\\"', "'").replace('"', "'")
+                    }
+                logger.error(f"Failed to parse LLM response: {text}")
                 return None
         except Exception as e:
             logger.error(f"LLM API error: {e}")
