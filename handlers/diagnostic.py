@@ -304,7 +304,7 @@ async def handle_decision(message: Message, state: FSMContext):
             await state.clear()
             instructions = get_text(lang, "instructions")
             await message.answer(instructions)
-            await state.set_state(PreFSMStates.awaiting_s0)
+            await state.set_state(PreFSMStates.initial_problem)
     except Exception as e:
         logger.error(f"Error in handle_decision: {e}")
         session = await storage.get_session(user_id) or {}
