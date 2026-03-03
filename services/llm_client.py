@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 import google.generativeai as genai
 from config import GEMINI_API_KEY
 
@@ -13,29 +12,17 @@ class LLMClient:
 
     async def get_response(self, prompt: str, user_id: int = None):
         try:
-            # Превращаем строку или список в правильный формат для Gemini (parts вместо content)
-            formatted_prompt = [{"role": "user", "parts": [prompt]}]
-            
-            response = await self.model.generate_content_async(formatted_prompt)
+            # Твой оригинальный вызов
+            response = await self.model.generate_content_async(prompt)
             text = response.text.strip()
             
-            # Очистка от markdown
-            text = re.sub(r'```json\s*|```', '', text)
+            # Минимальная очистка markdown, если Gemini его добавит
+            if text.startswith("```json"):
+                text = text.split("```json")[1].split("```")[0].strip()
             
-            try:
-                data = json.loads(text)
-                return data if data else {}
-            except json.JSONDecodeError:
-                type_match = re.search(r'"type"\s*:\s*"(.*?)"', text)
-                content_match = re.search(r'"content"\s*:\s*"(.*)"', text, re.DOTALL)
-                if type_match and content_match:
-                    return {
-                        "type": type_match.group(1),
-                        "content": content_match.group(1).replace('\\"', "'").replace('"', "'")
-                    }
-                return {}
+            return json.loads(text)
         except Exception as e:
             logger.error(f"LLM API error: {e}")
-            return {} # Возвращаем пустой дикт вместо None, чтобы избежать ошибок .get()
+            return {}
 
 llm_client = LLMClient()

@@ -7,22 +7,16 @@ async def handle(request):
     return web.Response(text="OK", status=200)
 
 async def main():
+    # Запуск порта для Render
     app = web.Application()
-    # GET автоматически обрабатывает HEAD в aiohttp
     app.router.add_get("/", handle)
-    
     runner = web.AppRunner(app)
     await runner.setup()
-    
-    port = int(os.environ.get("PORT", 10000))
-    site = web.TCPSite(runner, "0.0.0.0", port)
+    site = web.TCPSite(runner, "0.0.0.0", int(os.environ.get("PORT", 10000)))
     await site.start()
     
-    # Запуск бота
+    # Твой основной бот
     await run_bot()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        pass
+    asyncio.run(main())
