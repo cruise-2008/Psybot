@@ -13,28 +13,29 @@ class LLMClient:
 
     async def get_response(self, prompt: str, user_id: int = None):
         try:
-            response = await self.model.generate_content_async(prompt)
+            # Превращаем строку или список в правильный формат для Gemini (parts вместо content)
+            formatted_prompt = [{"role": "user", "parts": [prompt]}]
+            
+            response = await self.model.generate_content_async(formatted_prompt)
             text = response.text.strip()
             
-            # Очистка от markdown оберток
+            # Очистка от markdown
             text = re.sub(r'```json\s*|```', '', text)
             
             try:
-                return json.loads(text)
+                data = json.loads(text)
+                return data if data else {}
             except json.JSONDecodeError:
-                # Резервный парсинг для сложных случаев с кавычками
                 type_match = re.search(r'"type"\s*:\s*"(.*?)"', text)
                 content_match = re.search(r'"content"\s*:\s*"(.*)"', text, re.DOTALL)
-                
                 if type_match and content_match:
                     return {
                         "type": type_match.group(1),
                         "content": content_match.group(1).replace('\\"', "'").replace('"', "'")
                     }
-                logger.error(f"Failed to parse LLM response: {text}")
-                return None
+                return {}
         except Exception as e:
             logger.error(f"LLM API error: {e}")
-            return None
+            return {} # Возвращаем пустой дикт вместо None, чтобы избежать ошибок .get()
 
 llm_client = LLMClient()
